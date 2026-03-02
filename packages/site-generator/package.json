@@ -1,0 +1,13 @@
+{
+  "name": "@agency-os/site-generator",
+  "version": "0.0.1",
+  "bin": {
+    "generate-site": "./src/generate.ts"
+  },
+  "dependencies": {
+    "@agency-os/db": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
