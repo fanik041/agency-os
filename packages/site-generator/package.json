@@ -1,6 +1,8 @@
 {
   "name": "@agency-os/site-generator",
   "version": "0.0.1",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "bin": {
     "generate-site": "./src/generate.ts"
   },
@@ -8,6 +10,8 @@
     "@agency-os/db": "workspace:*"
   },
   "devDependencies": {
+    "tsx": "^4.7.0",
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   }
 }

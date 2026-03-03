@@ -1,0 +1,70 @@
+{
+  "businessName": "Pro Plumbing Co.",
+  "phone": "(555) 123-4567",
+  "email": "info@proplumbing.com",
+  "address": "123 Main St, Austin, TX 78701",
+  "city": "Austin",
+  "state": "TX",
+  "googleReviewUrl": "https://g.page/example/review",
+  "contactEmail": "leads@proplumbing.com",
+  "colors": {
+    "primary": "#1e40af",
+    "primaryForeground": "#ffffff",
+    "secondary": "#dbeafe",
+    "secondaryForeground": "#1e3a5f",
+    "accent": "#3b82f6"
+  },
+  "hero": {
+    "headline": "Austin's Trusted Plumbing Experts",
+    "subheadline": "Pro Plumbing Co. provides fast, reliable plumbing services in Austin, TX. Available 24/7 for emergencies.",
+    "cta": "Call Now for a Free Estimate"
+  },
+  "seo": {
+    "title": "Pro Plumbing Co. | Plumber in Austin, TX",
+    "description": "Pro Plumbing Co. offers professional plumbing services in Austin, TX. Emergency plumbing, drain cleaning, water heater repair & more. Call today!"
+  },
+  "services": [
+    {
+      "slug": "emergency-plumbing",
+      "name": "Emergency Plumbing",
+      "description": "24/7 emergency plumbing services. Burst pipes, overflows, and urgent repairs handled fast.",
+      "icon": "Siren"
+    },
+    {
+      "slug": "drain-cleaning",
+      "name": "Drain Cleaning",
+      "description": "Professional drain cleaning to clear clogs and keep your plumbing flowing smoothly.",
+      "icon": "Droplets"
+    },
+    {
+      "slug": "water-heater",
+      "name": "Water Heater Repair & Install",
+      "description": "Expert water heater repair, replacement, and new installation for tank and tankless units.",
+      "icon": "Flame"
+    }
+  ],
+  "areas": [
+    {
+      "slug": "downtown-austin",
+      "name": "Downtown Austin",
+      "description": "Serving downtown Austin with fast, reliable plumbing services."
+    },
+    {
+      "slug": "north-austin",
+      "name": "North Austin",
+      "description": "Professional plumbing for North Austin homes and businesses."
+    },
+    {
+      "slug": "south-austin",
+      "name": "South Austin",
+      "description": "Trusted plumbing services in South Austin and surrounding areas."
+    }
+  ],
+  "trustSignals": [
+    "Licensed & Insured",
+    "24/7 Emergency Service",
+    "Free Estimates",
+    "Satisfaction Guaranteed",
+    "20+ Years Experience"
+  ]
+}

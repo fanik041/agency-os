@@ -1,0 +1,57 @@
+{
+  "niche": "hvac",
+  "colors": {
+    "primary": "#dc2626",
+    "primaryForeground": "#ffffff",
+    "secondary": "#fee2e2",
+    "secondaryForeground": "#7f1d1d",
+    "accent": "#ef4444"
+  },
+  "hero": {
+    "headline": "{city}'s Heating & Cooling Pros",
+    "subheadline": "{businessName} keeps your home comfortable year-round with expert HVAC services in {city}, {state}.",
+    "cta": "Schedule Your Service Today"
+  },
+  "seo": {
+    "title": "{businessName} | HVAC Services in {city}, {state}",
+    "description": "{businessName} provides heating, cooling, and air quality services in {city}, {state}. AC repair, furnace install, and more. Call now!"
+  },
+  "services": [
+    {
+      "slug": "ac-repair",
+      "name": "AC Repair & Installation",
+      "description": "Keep cool with expert air conditioning repair, maintenance, and new system installation.",
+      "icon": "Snowflake"
+    },
+    {
+      "slug": "heating",
+      "name": "Heating Services",
+      "description": "Furnace repair, heat pump installation, and heating system maintenance to keep you warm.",
+      "icon": "Flame"
+    },
+    {
+      "slug": "air-quality",
+      "name": "Indoor Air Quality",
+      "description": "Air filtration, duct cleaning, and humidity control for healthier indoor air.",
+      "icon": "Wind"
+    }
+  ],
+  "defaultAreas": [
+    {
+      "slug": "downtown",
+      "name": "Downtown",
+      "description": "HVAC services in downtown {city} and surrounding neighborhoods."
+    },
+    {
+      "slug": "suburbs",
+      "name": "Suburbs",
+      "description": "Serving homes and businesses across the {city} metro area."
+    }
+  ],
+  "trustSignals": [
+    "Licensed & Insured",
+    "24/7 Emergency Service",
+    "Free Estimates",
+    "Energy-Efficient Solutions"
+  ]
+}

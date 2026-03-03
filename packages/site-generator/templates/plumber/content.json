@@ -1,0 +1,93 @@
+{
+  "niche": "plumber",
+  "colors": {
+    "primary": "#1e40af",
+    "primaryForeground": "#ffffff",
+    "secondary": "#dbeafe",
+    "secondaryForeground": "#1e3a5f",
+    "accent": "#3b82f6"
+  },
+  "hero": {
+    "headline": "{city}'s Trusted Plumbing Experts",
+    "subheadline": "{businessName} provides fast, reliable plumbing services in {city}, {state}. Available 24/7 for emergencies.",
+    "cta": "Call Now for a Free Estimate"
+  },
+  "seo": {
+    "title": "{businessName} | Plumber in {city}, {state}",
+    "description": "{businessName} offers professional plumbing services in {city}, {state}. Emergency plumbing, drain cleaning, water heater repair & more. Call today!"
+  },
+  "services": [
+    {
+      "slug": "emergency-plumbing",
+      "name": "Emergency Plumbing",
+      "description": "24/7 emergency plumbing services. Burst pipes, overflows, and urgent repairs handled fast.",
+      "icon": "Siren"
+    },
+    {
+      "slug": "drain-cleaning",
+      "name": "Drain Cleaning",
+      "description": "Professional drain cleaning to clear clogs and keep your plumbing flowing smoothly.",
+      "icon": "Droplets"
+    },
+    {
+      "slug": "water-heater",
+      "name": "Water Heater Repair & Install",
+      "description": "Expert water heater repair, replacement, and new installation for tank and tankless units.",
+      "icon": "Flame"
+    },
+    {
+      "slug": "pipe-repair",
+      "name": "Pipe Repair & Replacement",
+      "description": "Fix leaking, corroded, or burst pipes with minimal disruption to your property.",
+      "icon": "Wrench"
+    },
+    {
+      "slug": "sewer-line",
+      "name": "Sewer Line Services",
+      "description": "Sewer line inspection, repair, and replacement using the latest trenchless technology.",
+      "icon": "Construction"
+    },
+    {
+      "slug": "leak-detection",
+      "name": "Leak Detection",
+      "description": "Advanced leak detection to find hidden leaks before they cause major damage.",
+      "icon": "Search"
+    },
+    {
+      "slug": "fixture-installation",
+      "name": "Fixture Installation",
+      "description": "Professional installation of faucets, toilets, sinks, and other plumbing fixtures.",
+      "icon": "Hammer"
+    },
+    {
+      "slug": "bathroom-remodel",
+      "name": "Bathroom Remodel Plumbing",
+      "description": "Complete plumbing services for bathroom remodels, from rough-in to finish.",
+      "icon": "Bath"
+    }
+  ],
+  "defaultAreas": [
+    {
+      "slug": "downtown",
+      "name": "Downtown",
+      "description": "Serving downtown {city} with fast, reliable plumbing services."
+    },
+    {
+      "slug": "north-side",
+      "name": "North Side",
+      "description": "Professional plumbing for North {city} homes and businesses."
+    },
+    {
+      "slug": "south-side",
+      "name": "South Side",
+      "description": "Trusted plumbing services in South {city} and surrounding areas."
+    }
+  ],
+  "trustSignals": [
+    "Licensed & Insured",
+    "24/7 Emergency Service",
+    "Free Estimates",
+    "Satisfaction Guaranteed",
+    "20+ Years Experience"
+  ]
+}

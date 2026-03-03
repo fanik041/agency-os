@@ -1,4 +1,4 @@
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 
 export interface RawBusiness {
   name: string
@@ -16,7 +16,15 @@ async function getBrowser(): Promise<Browser> {
   if (!browser || !browser.isConnected()) {
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-background-networking',
+      ],
     })
   }
   return browser
@@ -29,6 +37,89 @@ export async function closeBrowser() {
   }
 }
 
+// ── Stealth helpers ──────────────────────────────────────────────
+
+function randomDelay(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+const STEALTH_INIT_SCRIPT = `
+  // Hide webdriver flag
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+  // Fake plugins array (real Chrome has plugins)
+  Object.defineProperty(navigator, 'plugins', {
+    get: () => [
+      { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+      { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+      { name: 'Native Client', filename: 'internal-nacl-plugin' },
+    ],
+  });
+
+  // Fake languages
+  Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+
+  // Pass Chrome app check
+  window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}) };
+
+  // Hide headless in permissions query
+  const originalQuery = window.navigator.permissions?.query?.bind(window.navigator.permissions);
+  if (originalQuery) {
+    window.navigator.permissions.query = (params) =>
+      params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : originalQuery(params);
+  }
+`
+
+async function createStealthContext(b: Browser): Promise<BrowserContext> {
+  const context = await b.newContext({
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 900 },
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    geolocation: undefined,
+    permissions: [],
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  })
+  await context.addInitScript(STEALTH_INIT_SCRIPT)
+  return context
+}
+
+/** Dismiss Google cookie consent if it appears */
+async function dismissConsent(page: Page) {
+  try {
+    // Google consent buttons — try multiple selectors
+    const selectors = [
+      'button[aria-label="Accept all"]',
+      'button[aria-label="Reject all"]',
+      'form[action*="consent"] button',
+      '[aria-label="Before you continue to Google Maps"] button:first-of-type',
+    ]
+    for (const sel of selectors) {
+      const btn = await page.$(sel)
+      if (btn) {
+        await btn.click()
+        await page.waitForTimeout(randomDelay(800, 1500))
+        return
+      }
+    }
+    // Fallback: look for "Accept all" by text content
+    const acceptBtn = await page.locator('button:has-text("Accept all")').first()
+    if (await acceptBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await acceptBtn.click()
+      await page.waitForTimeout(randomDelay(800, 1500))
+    }
+  } catch {
+    // No consent dialog — continue
+  }
+}
+
+// ── Core scraper ─────────────────────────────────────────────────
+
 async function autoScroll(page: Page, containerSelector: string, maxScrolls = 10) {
   for (let i = 0; i < maxScrolls; i++) {
     const container = await page.$(containerSelector)
@@ -36,7 +127,7 @@ async function autoScroll(page: Page, containerSelector: string, maxScrolls = 10
 
     const previousHeight = await container.evaluate((el) => el.scrollHeight)
     await container.evaluate((el) => el.scrollTo(0, el.scrollHeight))
-    await page.waitForTimeout(1500)
+    await page.waitForTimeout(randomDelay(1200, 2200))
     const newHeight = await container.evaluate((el) => el.scrollHeight)
 
     // Stop if we've reached the bottom
@@ -89,23 +180,25 @@ export async function scrapeGoogleMaps(
   onLead?: (business: RawBusiness) => Promise<void>
 ): Promise<RawBusiness[]> {
   const b = await getBrowser()
-  const context = await b.newContext({
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 900 },
-  })
+  const context = await createStealthContext(b)
   const page = await context.newPage()
   const results: RawBusiness[] = []
 
   try {
     const query = encodeURIComponent(`${niche} in ${location}`)
     await page.goto(`https://www.google.com/maps/search/${query}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     })
 
-    // Wait for results to load
+    // Dismiss cookie consent if Google shows it
+    await dismissConsent(page)
+
+    // Wait for results to load (longer timeout for slow connections)
     await page.waitForSelector('a.hfpxzc', { timeout: 15000 }).catch(() => null)
+
+    // Small human-like delay before scrolling
+    await page.waitForTimeout(randomDelay(1000, 2000))
 
     // Scroll the results panel to load more listings
     const feedSelector = 'div[role="feed"]'
@@ -129,7 +222,7 @@ export async function scrapeGoogleMaps(
         const link = await page.$(`a.hfpxzc[aria-label="${listing.name.replace(/"/g, '\\"')}"]`)
         if (!link) continue
         await link.click()
-        await page.waitForTimeout(2000)
+        await page.waitForTimeout(randomDelay(1500, 3000))
 
         // Extract rating
         let rating: number | null = null
@@ -168,7 +261,7 @@ export async function scrapeGoogleMaps(
         const backButton = await page.$('button[aria-label="Back"]')
         if (backButton) {
           await backButton.click()
-          await page.waitForTimeout(1000)
+          await page.waitForTimeout(randomDelay(800, 1500))
         }
       } catch (err) {
         console.warn(`  Failed to extract listing "${listing.name}":`, err)

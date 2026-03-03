@@ -1,0 +1,57 @@
+{
+  "niche": "dentist",
+  "colors": {
+    "primary": "#0d9488",
+    "primaryForeground": "#ffffff",
+    "secondary": "#ccfbf1",
+    "secondaryForeground": "#134e4a",
+    "accent": "#14b8a6"
+  },
+  "hero": {
+    "headline": "Your Family Dentist in {city}",
+    "subheadline": "{businessName} provides gentle, comprehensive dental care for the whole family in {city}, {state}.",
+    "cta": "Book Your Appointment Today"
+  },
+  "seo": {
+    "title": "{businessName} | Dentist in {city}, {state}",
+    "description": "{businessName} offers family & cosmetic dentistry in {city}, {state}. Cleanings, implants, whitening & more. New patients welcome!"
+  },
+  "services": [
+    {
+      "slug": "general-dentistry",
+      "name": "General Dentistry",
+      "description": "Comprehensive exams, cleanings, fillings, and preventive care for the whole family.",
+      "icon": "Stethoscope"
+    },
+    {
+      "slug": "cosmetic-dentistry",
+      "name": "Cosmetic Dentistry",
+      "description": "Teeth whitening, veneers, and smile makeovers to help you look your best.",
+      "icon": "Sparkles"
+    },
+    {
+      "slug": "dental-implants",
+      "name": "Dental Implants",
+      "description": "Permanent tooth replacement with natural-looking dental implants.",
+      "icon": "CircleDot"
+    }
+  ],
+  "defaultAreas": [
+    {
+      "slug": "downtown",
+      "name": "Downtown",
+      "description": "Convenient dental care in downtown {city}."
+    },
+    {
+      "slug": "suburbs",
+      "name": "Suburbs",
+      "description": "Serving families across the {city} suburbs."
+    }
+  ],
+  "trustSignals": [
+    "Accepting New Patients",
+    "Most Insurance Accepted",
+    "Gentle & Comfortable Care",
+    "Modern Technology"
+  ]
+}

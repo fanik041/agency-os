@@ -9,6 +9,9 @@ export type CallOutcome =
   | 'demo_booked'
   | 'closed'
 export type RevenueType = 'deposit' | 'final' | 'retainer'
+export type ResearchJobStatus = 'queued' | 'running' | 'done' | 'failed'
+export type ContactSource = 'google_linkedin' | 'website_about' | 'website_contact' | 'manual'
+export type LeadSourceType = 'scrape' | 'import' | 'manual'
 
 export interface Lead {
   id: string
@@ -27,6 +30,7 @@ export interface Lead {
   call_status: CallStatus
   call_notes: string | null
   called_at: string | null
+  source_id: string | null
   created_at: string
 }
 
@@ -85,6 +89,43 @@ export interface RevenueEvent {
   notes: string | null
 }
 
+export interface Contact {
+  id: string
+  lead_id: string | null
+  name: string
+  title: string | null
+  email: string | null
+  phone: string | null
+  linkedin_url: string | null
+  source: ContactSource | null
+  confidence: number | null // 1-5, 5 = high
+  notes: string | null
+  tags: string[]
+  created_at: string
+}
+
+export interface ResearchJob {
+  id: string
+  status: ResearchJobStatus
+  lead_ids: string[]
+  total: number
+  processed: number
+  contacts_found: number
+  error_message: string | null
+  started_at: string | null
+  finished_at: string | null
+  created_at: string
+}
+
+export interface LeadSource {
+  id: string
+  type: LeadSourceType
+  label: string
+  scrape_job_id: string | null
+  leads_count: number
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -112,6 +153,21 @@ export interface Database {
         Row: RevenueEvent
         Insert: Omit<RevenueEvent, 'id'>
         Update: Partial<Omit<RevenueEvent, 'id'>>
+      }
+      contacts: {
+        Row: Contact
+        Insert: Omit<Contact, 'id' | 'created_at'>
+        Update: Partial<Omit<Contact, 'id' | 'created_at'>>
+      }
+      research_jobs: {
+        Row: ResearchJob
+        Insert: Omit<ResearchJob, 'id' | 'created_at'>
+        Update: Partial<Omit<ResearchJob, 'id' | 'created_at'>>
+      }
+      lead_sources: {
+        Row: LeadSource
+        Insert: Omit<LeadSource, 'id' | 'created_at'>
+        Update: Partial<Omit<LeadSource, 'id' | 'created_at'>>
       }
     }
   }
