@@ -1,9 +1,10 @@
 {
   "name": "@agency-os/db",
   "version": "0.0.1",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
