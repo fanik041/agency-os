@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   LayoutDashboard,
   Users,
@@ -13,8 +13,10 @@ import {
   Globe,
   Menu,
   X,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { logout } from '@/app/login/actions'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,6 +31,11 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  function handleLogout() {
+    startTransition(() => logout())
+  }
 
   return (
     <>
@@ -62,6 +69,14 @@ export function Sidebar() {
               </Link>
             )
           })}
+          <button
+            onClick={handleLogout}
+            disabled={isPending}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50 disabled:opacity-50"
+          >
+            <LogOut className="h-4 w-4" />
+            {isPending ? 'Signing out…' : 'Sign out'}
+          </button>
         </nav>
       )}
 
@@ -90,6 +105,16 @@ export function Sidebar() {
             )
           })}
         </nav>
+        <div className="border-t p-2">
+          <button
+            onClick={handleLogout}
+            disabled={isPending}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50 disabled:opacity-50"
+          >
+            <LogOut className="h-4 w-4" />
+            {isPending ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
       </aside>
     </>
   )
