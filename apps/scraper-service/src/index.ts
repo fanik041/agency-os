@@ -470,6 +470,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
             source: contact.source,
             confidence: contact.confidence,
             notes: null,
+            tags: [],
           })
           if (!error) contactsFound++
         }
