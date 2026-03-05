@@ -10,7 +10,7 @@ COPY apps/scraper-service ./apps/scraper-service
 
 RUN pnpm install --frozen-lockfile
 
-RUN npx playwright install --with-deps chromium
+RUN pnpm --filter @agency-os/scraper-service exec playwright install --with-deps chromium
 
 EXPOSE 8080
 
