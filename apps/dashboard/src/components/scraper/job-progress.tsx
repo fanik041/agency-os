@@ -10,7 +10,40 @@ import { JOB_STATUS_COLORS } from '@/lib/constants'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { updateJobStatusAction } from '@/app/scraper/actions'
 import { toast } from 'sonner'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+
+const LOG_PREVIEW_LENGTH = 280
+
+function JobLog({ message }: { message: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = message.length > LOG_PREVIEW_LENGTH
+  const displayText = isLong && !expanded ? `${message.slice(0, LOG_PREVIEW_LENGTH).trim()}…` : message
+
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-3">
+      <pre className="whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground overflow-x-auto max-h-[320px] overflow-y-auto">
+        {displayText}
+      </pre>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="h-3.5 w-3.5" /> Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3.5 w-3.5" /> Read more
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
 
 function JobTimestamp({ date }: { date: string }) {
   const [formatted, setFormatted] = useState('')
@@ -126,7 +159,7 @@ export function JobProgress({ initialJobs }: { initialJobs: ScrapeJob[] }) {
                   )}
 
                   {job.error_message && (
-                    <p className="text-xs text-red-600">{job.error_message}</p>
+                    <JobLog message={job.error_message} />
                   )}
 
                   <JobTimestamp date={job.created_at} />
