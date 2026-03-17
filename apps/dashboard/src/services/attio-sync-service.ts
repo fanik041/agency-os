@@ -1,0 +1,168 @@
+import type { AttioClient, AttioDiffEntry, AttioDiffField } from '@agency-os/attio'
+import type { LeadRepository } from '@agency-os/db'
+import type { Lead } from '@agency-os/db'
+import { AttioSyncStatus } from '@agency-os/db'
+
+const STATUS_MAP: Record<string, string> = {
+  new: 'New', scoring: 'Scoring', needs_review: 'Needs Review',
+  approved: 'Approved', sent: 'Sent', replied: 'Replied',
+  booked: 'Booked', closed: 'Closed', skip: 'Skip',
+}
+
+export class AttioSyncService {
+  constructor(
+    private attioClient: AttioClient,
+    private leadRepo: LeadRepository,
+  ) {}
+
+  async fetchEntries(): Promise<{
+    workspace: string
+    listName: string
+    entries: { company_name: string; values: Record<string, unknown> }[]
+  }> {
+    const { workspace } = await this.attioClient.verifyConnection()
+    const listName = await this.attioClient.getListName()
+    const entries = await this.attioClient.fetchAllEntries()
+    return {
+      workspace,
+      listName,
+      entries: entries.map(e => ({ company_name: e.name, values: e.values })),
+    }
+  }
+
+  async deduplicate(): Promise<{ duplicatesFound: number; removed: number; failed: number }> {
+    const entries = await this.attioClient.fetchAllEntries()
+    const byName = new Map<string, typeof entries>()
+    for (const e of entries) {
+      const key = e.name.toLowerCase().trim()
+      if (!key) continue
+      const group = byName.get(key) ?? []
+      group.push(e)
+      byName.set(key, group)
+    }
+
+    const toDelete: { entryId: string; name: string }[] = []
+    for (const [, group] of byName) {
+      if (group.length <= 1) continue
+      group.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      for (let i = 1; i < group.length; i++) {
+        toDelete.push({ entryId: group[i].entryId, name: group[i].name })
+      }
+    }
+
+    if (toDelete.length === 0) return { duplicatesFound: 0, removed: 0, failed: 0 }
+
+    let removed = 0
+    let failed = 0
+    for (const dup of toDelete) {
+      try {
+        await this.attioClient.deleteEntry(dup.entryId)
+        removed++
+      } catch {
+        failed++
+      }
+    }
+    return { duplicatesFound: toDelete.length, removed, failed }
+  }
+
+  async compare(): Promise<{
+    diffs: AttioDiffEntry[]
+    unchanged: number
+    unmatched: number
+    supabaseCount: number
+    attioCount: number
+  }> {
+    const [leads, attioEntries] = await Promise.all([
+      this.leadRepo.getAll(),
+      this.attioClient.fetchAllEntries(),
+    ])
+
+    const attioByName = new Map(
+      attioEntries.map(e => [e.name.toLowerCase().trim(), e])
+    )
+
+    const diffs: AttioDiffEntry[] = []
+    let unchanged = 0
+    let unmatched = 0
+
+    for (const lead of leads) {
+      const attioEntry = attioByName.get(lead.name.toLowerCase().trim())
+      if (!attioEntry) { unmatched++; continue }
+
+      const desired = this.leadToAttioValues(lead)
+      const diffFields: AttioDiffField[] = []
+
+      for (const [key, desiredVal] of Object.entries(desired)) {
+        const desiredStr = String(desiredVal ?? '')
+        const attioStr = String(attioEntry.values[key] ?? '')
+        if (desiredStr !== attioStr) {
+          diffFields.push({ field: key, supabase: desiredStr || '(empty)', attio: attioStr || '(empty)' })
+        }
+      }
+
+      if (diffFields.length === 0) { unchanged++; continue }
+
+      diffs.push({
+        leadId: lead.id,
+        leadName: lead.name,
+        recordId: attioEntry.recordId,
+        diffs: diffFields,
+        entryValues: desired,
+      })
+    }
+
+    return { diffs, unchanged, unmatched, supabaseCount: leads.length, attioCount: attioEntries.length }
+  }
+
+  async syncEntry(entry: {
+    leadId: string
+    leadName: string
+    recordId: string
+    entryValues: Record<string, unknown>
+    changedFields: string[]
+  }): Promise<{ ok: boolean; error?: string }> {
+    const patchValues: Record<string, unknown> = { company_name: entry.entryValues.company_name }
+    for (const field of entry.changedFields) {
+      if (field !== 'company_name') patchValues[field] = entry.entryValues[field]
+    }
+
+    try {
+      await this.attioClient.upsertEntry(entry.recordId, patchValues)
+      await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Synced)
+      return { ok: true }
+    } catch (err) {
+      await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Failed).catch(() => {})
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  private leadToAttioValues(lead: Lead): Record<string, unknown> {
+    const v: Record<string, unknown> = { company_name: lead.name }
+    if (lead.website) v.website = lead.website
+    if (lead.phone) v.phone = lead.phone
+    if (lead.place_id) v.place_id = lead.place_id
+    if (lead.reviews_raw) v.reviews_raw = lead.reviews_raw
+    if (lead.pain_points) v.pain_points = lead.pain_points
+    if (lead.suggested_angle) v.suggested_angle = lead.suggested_angle
+    if (lead.message_draft) v.message_draft = lead.message_draft
+    if (lead.email_found) v.email_found = lead.email_found
+    if (lead.notes) v.notes = lead.notes
+    v.has_booking = lead.has_booking
+    v.has_chat_widget = lead.has_chat_widget
+    v.has_contact_form = lead.has_contact_form
+    if (lead.pain_score != null) v.pain_score = lead.pain_score
+    if (lead.review_count != null && lead.review_count > 0) {
+      v.review_count = lead.review_count
+      v.count = lead.review_count
+    }
+    if (lead.rating != null) v.rating_3 = `${lead.rating}/5`
+    if (lead.analyze) v.analyze = lead.analyze
+    if (lead.status && STATUS_MAP[lead.status]) v.status = STATUS_MAP[lead.status]
+    if (lead.follow_up_date) v.follow_up_date = lead.follow_up_date
+    if (lead.niche) v.niche = lead.niche
+    if (lead.city) v.city = lead.city
+    if (lead.address) v.address = lead.address
+    if (lead.maps_url) v.maps_url = lead.maps_url
+    return v
+  }
+}
