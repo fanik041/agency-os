@@ -82,7 +82,7 @@ export function CallLoggerSheet({
               <span className="text-muted-foreground">Website</span>
               <span className="font-medium">
                 {lead.website ? (
-                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  <a href={lead.website?.startsWith('http') ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                     {lead.website.replace(/https?:\/\//, '')}
                   </a>
                 ) : 'N/A'}

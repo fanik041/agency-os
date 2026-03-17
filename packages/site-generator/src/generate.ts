@@ -24,8 +24,15 @@ function copyDirSync(src: string, dest: string) {
 }
 
 export async function generateSite(input: GenerateSiteInput): Promise<DeployResult> {
-  // 1. Load niche content
+  // 1. Load niche content (validate niche to prevent path traversal)
+  if (/[\/\\.]/.test(input.niche)) {
+    throw new Error(`Invalid niche name: ${input.niche}`)
+  }
   const nicheDir = path.join(TEMPLATES_DIR, input.niche)
+  const resolved = path.resolve(nicheDir)
+  if (!resolved.startsWith(TEMPLATES_DIR + path.sep)) {
+    throw new Error(`Invalid niche: ${input.niche}`)
+  }
   const contentPath = path.join(nicheDir, 'content.json')
   if (!fs.existsSync(contentPath)) {
     throw new Error(`No template found for niche: ${input.niche}`)

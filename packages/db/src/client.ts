@@ -12,7 +12,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
     }
-    return (_supabase as any)[prop]
+    return Reflect.get(_supabase, prop)
   },
 })
 
@@ -31,6 +31,6 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
         }
       )
     }
-    return (_supabaseAdmin as any)[prop]
+    return Reflect.get(_supabaseAdmin, prop)
   },
 })

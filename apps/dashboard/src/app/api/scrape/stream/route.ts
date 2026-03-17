@@ -1,6 +1,10 @@
 export const dynamic = 'force-dynamic'
 
+import { requireAuth } from '@/lib/auth'
+
 export async function POST(req: Request) {
+  await requireAuth()
+
   const scraperUrl = process.env.SCRAPER_SERVICE_URL
   if (!scraperUrl) {
     return Response.json({ error: 'SCRAPER_SERVICE_URL is not configured' }, { status: 500 })

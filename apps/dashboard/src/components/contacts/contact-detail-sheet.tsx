@@ -113,7 +113,7 @@ export function ContactDetailSheet({
               <span className="font-medium">
                 {contact.linkedin_url ? (
                   <a
-                    href={contact.linkedin_url}
+                    href={contact.linkedin_url?.startsWith('http') ? contact.linkedin_url : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
