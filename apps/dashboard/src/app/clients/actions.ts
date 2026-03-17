@@ -103,8 +103,9 @@ export async function updateClientAction(id: string, formData: FormData) {
     site_status: (formData.get('site_status') as string) || SiteStatus.Building,
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id: _id, ...updates } = parsed
+  const updates = Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => key !== 'id')
+  )
   await container.clientRepo.update(id, updates as Partial<Omit<Client, 'id' | 'created_at'>>)
 
   revalidatePath(`/clients/${id}`)

@@ -10,6 +10,13 @@ interface FileEntry {
   data: string // base64
 }
 
+interface VercelDeploymentResponse {
+  id: string
+  url: string
+  projectId: string
+  readyState: string
+}
+
 const VERCEL_API = 'https://api.vercel.com'
 
 function collectFiles(dir: string, base: string = dir): FileEntry[] {
@@ -33,8 +40,7 @@ function collectFiles(dir: string, base: string = dir): FileEntry[] {
   return entries
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function vercelFetch(endpoint: string, options: RequestInit & { token: string; teamId?: string }): Promise<any> {
+async function vercelFetch(endpoint: string, options: RequestInit & { token: string; teamId?: string }): Promise<VercelDeploymentResponse> {
   const { token, teamId, ...fetchOpts } = options
   const url = new URL(endpoint, VERCEL_API)
   if (teamId) url.searchParams.set('teamId', teamId)
@@ -53,7 +59,7 @@ async function vercelFetch(endpoint: string, options: RequestInit & { token: str
     throw new Error(`Vercel API error ${res.status}: ${body}`)
   }
 
-  return res.json()
+  return res.json() as Promise<VercelDeploymentResponse>
 }
 
 async function pollDeployment(deploymentId: string, token: string, teamId?: string): Promise<string> {
