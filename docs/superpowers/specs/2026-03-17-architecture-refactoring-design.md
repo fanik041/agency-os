@@ -145,7 +145,7 @@ export const logCallSchema = z.object({
   leadId: z.string().uuid(),
   outcome: z.nativeEnum(CallOutcome),
   notes: z.string().max(5000),
-  durationSeconds: z.number().int().nonnull().nullable(),
+  durationSeconds: z.number().int().nullable(),
 })
 
 export const importLeadsSchema = z.object({
@@ -165,7 +165,7 @@ export const updateSingleAttioEntrySchema = z.object({
   leadId: z.string().uuid(),
   leadName: z.string().min(1),
   recordId: z.string().min(1),
-  entryValues: z.record(z.unknown()),
+  entryValues: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
   changedFields: z.array(z.string()),
 })
 ```
@@ -247,7 +247,9 @@ export class LeadRepository {
     if (filters.sourceId) query = query.eq('source_id', filters.sourceId)
 
     query = query.range(from, to)
-    return query
+    const { data, count, error } = await query
+    if (error) throw new Error(`Failed to fetch leads: ${error.message}`)
+    return { data: (data ?? []) as Lead[], count: count ?? 0 }
   }
 
   async updateStatus(id: string, status: LeadStatus, notes?: string) {
@@ -310,13 +312,18 @@ export class LeadRepository {
 }
 ```
 
-Similar repositories for:
-- `ClientRepository` — client CRUD, revenue queries
-- `ScrapeJobRepository` — scrape job CRUD
-- `CallLogRepository` — call log queries
-- `ContactRepository` — contact CRUD, linking
-- `ResearchJobRepository` — research job CRUD
-- `LeadSourceRepository` — lead source CRUD
+Additional repository method signatures (same pattern as LeadRepository — execute query, throw on error, return typed data):
+
+- **`LeadRepository`** (additional methods):
+  - `getCount(): Promise<number>` — wraps `getLeadCount`
+  - `bulkUpsert(leads): Promise<{ inserted: number; updated: number; errors: string[] }>` — wraps `bulkUpsertLeads`
+  - `getMinimal(): Promise<{ id: string; name: string; niche: string; city: string }[]>` — wraps `getAllLeadsMinimal`
+- **`ClientRepository`** — `getAll()`, `getById(id)`, `create(client)`, `update(id, updates)`, `getRevenue(clientId)`
+- **`ScrapeJobRepository`** — `getAll()`, `create(job)`, `update(id, updates)`
+- **`CallLogRepository`** — `log(entry)`, `getForLead(leadId)`
+- **`ContactRepository`** — `getAll()`, `getForLead(leadId)`, `upsert(contact)`, `update(id, updates)`, `updateTags(id, tags)`, `linkToLead(contactId, leadId)`
+- **`ResearchJobRepository`** — `getAll()`, `create(leadIds)`, `update(id, updates)`
+- **`LeadSourceRepository`** — `create(source)`, `updateCount(id, count)`
 
 ### Date Normalization
 
@@ -637,6 +644,20 @@ export class AttioSyncService {
     }
   }
 
+  /** Normalize a website URL to a bare domain */
+  private normalizeDomain(website: string | null): string | null {
+    if (!website) return null
+    const domain = website
+      .replace(/https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/[?#].*$/, '')
+      .replace(/:\d+/, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase()
+      .trim()
+    return domain || null
+  }
+
   private leadToAttioValues(lead: Lead): Record<string, unknown> {
     const v: Record<string, unknown> = { company_name: lead.name }
     if (lead.website) v.website = lead.website
@@ -673,11 +694,15 @@ export class AttioSyncService {
 
 ```typescript
 // apps/dashboard/src/services/lead-service.ts
-import type { LeadRepository } from '@agency-os/db'
-import type { Lead, LeadStatus, CallOutcome } from '@agency-os/db'
+import { LeadRepository, LeadSourceRepository } from '@agency-os/db'
+import { LeadStatus, CallOutcome } from '@agency-os/db'
+import type { Lead } from '@agency-os/db'
 
 export class LeadService {
-  constructor(private leadRepo: LeadRepository) {}
+  constructor(
+    private leadRepo: LeadRepository,
+    private sourceRepo: LeadSourceRepository,
+  ) {}
 
   async updateStatus(leadId: string, status: LeadStatus, notes?: string) {
     return this.leadRepo.updateStatus(leadId, status, notes)
@@ -685,16 +710,42 @@ export class LeadService {
 
   outcomeToLeadStatus(outcome: CallOutcome): LeadStatus {
     switch (outcome) {
-      case 'demo_booked': return 'booked' as LeadStatus
-      case 'closed': return 'closed' as LeadStatus
-      case 'not_interested': return 'skip' as LeadStatus
-      default: return 'sent' as LeadStatus
+      case CallOutcome.DemoBooked: return LeadStatus.Booked
+      case CallOutcome.Closed: return LeadStatus.Closed
+      case CallOutcome.NotInterested: return LeadStatus.Skip
+      default: return LeadStatus.Sent
     }
   }
 
-  async importLeads(leads: Omit<Lead, 'id' | 'created_at'>[], fileName?: string) {
-    // Lead source creation + bulk upsert logic
-    // Moved from actions.ts
+  async importLeads(leads: Array<{
+    name: string; niche: string | null; phone: string | null;
+    email: string | null; website: string | null;
+    pain_score: number | null; city: string | null;
+  }>, fileName?: string) {
+    const { data: source, error } = await this.sourceRepo.create({
+      type: 'import',
+      label: fileName || `Import (${leads.length} leads)`,
+    })
+    if (error || !source) throw new Error(`Failed to create source: ${error?.message}`)
+
+    const leadsToInsert = leads.map(l => ({
+      name: l.name, niche: l.niche, phone: l.phone, website: l.website,
+      address: null, rating: null, review_count: 0, maps_url: null,
+      place_id: null, city: l.city, has_website: !!l.website,
+      site_quality: null, pain_score: l.pain_score, pain_points: null,
+      suggested_angle: null, message_draft: null, email_found: l.email,
+      has_booking: false, has_chat_widget: false, has_contact_form: false,
+      reviews_raw: null, follow_up_date: null, notes: null,
+      page_load_ms: null, mobile_friendly: null, has_ssl: null,
+      seo_issues: null, has_cta: null, phone_on_site: null,
+      hours_on_site: null, has_social_proof: null, tech_stack: null,
+      analyze: null, status: LeadStatus.New, attio_sync_status: 'not_synced' as const,
+      attio_synced_at: null, source_id: source.id,
+    }))
+
+    const result = await this.leadRepo.bulkUpsert(leadsToInsert)
+    await this.sourceRepo.updateCount(source.id, result.inserted)
+    return result
   }
 }
 ```
@@ -705,14 +756,14 @@ export class LeadService {
 
 ### Pattern
 
-Every server action follows this pattern:
+Server actions keep their existing parameter signatures to avoid breaking frontend call sites.
+Zod validation is applied internally by wrapping args into an object:
 
 ```typescript
-export async function someAction(input: unknown) {
+export async function someAction(id: string, status: SomeEnum, notes?: string) {
   await requireAuth()
-  const parsed = someSchema.safeParse(input)
-  if (!parsed.success) throw new Error(`Invalid input: ${parsed.error.message}`)
-  return container.someService.doThing(parsed.data)
+  const parsed = someSchema.parse({ id, status, notes })
+  return container.someService.doThing(parsed)
 }
 ```
 
@@ -720,11 +771,16 @@ export async function someAction(input: unknown) {
 
 ```typescript
 // apps/dashboard/src/lib/auth.ts
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function requireAuth() {
-  const supabase = createServerComponentClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Unauthorized')
   return session
@@ -740,13 +796,49 @@ export async function requireAuth() {
 import { unstable_noStore, revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { container } from '@/lib/container'
+import type { LeadStatus, CallOutcome } from '@agency-os/db'
 import { updateLeadStatusSchema, logCallSchema, importLeadsSchema, updateSingleAttioEntrySchema } from '@agency-os/db'
 
-export async function updateLeadStatusAction(input: unknown) {
+// Existing signature preserved — no frontend changes needed
+export async function updateLeadStatusAction(leadId: string, status: LeadStatus, notes?: string) {
   await requireAuth()
-  const { leadId, status, notes } = updateLeadStatusSchema.parse(input)
-  await container.leadService.updateStatus(leadId, status, notes)
+  const parsed = updateLeadStatusSchema.parse({ leadId, status, notes })
+  await container.leadService.updateStatus(parsed.leadId, parsed.status, parsed.notes)
   revalidatePath('/leads')
+}
+
+export async function logCallAction(
+  leadId: string,
+  outcome: CallOutcome,
+  notes: string,
+  durationSeconds: number | null
+) {
+  await requireAuth()
+  const parsed = logCallSchema.parse({ leadId, outcome, notes, durationSeconds })
+  const newStatus = container.leadService.outcomeToLeadStatus(parsed.outcome)
+
+  await Promise.all([
+    container.callLogRepo.log({ lead_id: parsed.leadId, outcome: parsed.outcome, notes: parsed.notes || null, duration_seconds: parsed.durationSeconds }),
+    container.leadService.updateStatus(parsed.leadId, newStatus, parsed.notes || undefined),
+  ])
+
+  revalidatePath('/leads')
+}
+
+export async function fetchAttioEntriesAction() {
+  await requireAuth()
+  try {
+    const { workspace } = await container.attioClient.verifyConnection()
+    const listName = await container.attioClient.getListName()
+    const entries = await container.attioClient.fetchAllEntries()
+    const mapped = entries.map(e => ({
+      company_name: e.name,
+      values: e.values,
+    }))
+    return { ok: true as const, workspace, listName, entries: mapped }
+  } catch (err) {
+    return { ok: false as const, error: String(err), entries: [] }
+  }
 }
 
 export async function compareAttioAction() {
@@ -769,10 +861,34 @@ export async function deduplicateAttioAction() {
   }
 }
 
-export async function updateSingleAttioEntryAction(input: unknown) {
+export async function updateSingleAttioEntryAction(entry: {
+  leadId: string
+  leadName: string
+  recordId: string
+  entryValues: Record<string, unknown>
+  changedFields: string[]
+}) {
   await requireAuth()
-  const parsed = updateSingleAttioEntrySchema.parse(input)
+  const parsed = updateSingleAttioEntrySchema.parse(entry)
   return container.attioSyncService.syncEntry(parsed)
+}
+
+interface ParsedLead {
+  name: string
+  niche: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  pain_score: number | null
+  city: string | null
+}
+
+export async function importLeadsAction(leads: ParsedLead[], fileName?: string) {
+  await requireAuth()
+  const parsed = importLeadsSchema.parse({ leads, fileName })
+  const result = await container.leadService.importLeads(parsed.leads, parsed.fileName)
+  revalidatePath('/leads')
+  return result
 }
 ```
 
@@ -784,30 +900,45 @@ Constructor injection with manual wiring via lazy Proxy singleton:
 
 ```typescript
 // apps/dashboard/src/lib/container.ts
-import { LeadRepository } from '@agency-os/db'
+import { LeadRepository, LeadSourceRepository, CallLogRepository, ScrapeJobRepository } from '@agency-os/db'
 import { AttioClient } from '@agency-os/attio'
 import { AttioSyncService } from '@/services/attio-sync-service'
 import { LeadService } from '@/services/lead-service'
+import { ScraperService } from '@/services/scraper-service'
 
 interface Container {
   leadRepo: LeadRepository
+  callLogRepo: CallLogRepository
   attioClient: AttioClient
   leadService: LeadService
   attioSyncService: AttioSyncService
+  scraperService: ScraperService
 }
 
 let _container: Container | null = null
 
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Missing required env var: ${name}`)
+  return value
+}
+
 function createContainer(): Container {
   const leadRepo = new LeadRepository()
-  const attioClient = new AttioClient(
-    process.env.ATTIO_API_KEY!,
-    process.env.ATTIO_LIST_ID!,
-  )
-  const leadService = new LeadService(leadRepo)
-  const attioSyncService = new AttioSyncService(attioClient, leadRepo)
+  const sourceRepo = new LeadSourceRepository()
+  const callLogRepo = new CallLogRepository()
+  const jobRepo = new ScrapeJobRepository()
 
-  return { leadRepo, attioClient, leadService, attioSyncService }
+  const attioClient = new AttioClient(
+    requireEnv('ATTIO_API_KEY'),
+    requireEnv('ATTIO_LIST_ID'),
+  )
+
+  const leadService = new LeadService(leadRepo, sourceRepo)
+  const attioSyncService = new AttioSyncService(attioClient, leadRepo)
+  const scraperService = new ScraperService(jobRepo)
+
+  return { leadRepo, callLogRepo, attioClient, leadService, attioSyncService, scraperService }
 }
 
 export const container = new Proxy({} as Container, {
@@ -827,9 +958,13 @@ The scraper actions follow the same pattern:
 ```typescript
 // apps/dashboard/src/services/scraper-service.ts
 import type { ScrapeJobRepository } from '@agency-os/db'
+import { ScrapeJobStatus } from '@agency-os/db'
 
 export class ScraperService {
-  constructor(private jobRepo: ScrapeJobRepository) {}
+  constructor(
+    private jobRepo: ScrapeJobRepository,
+    private scraperServiceUrl: string,  // e.g. process.env.SCRAPER_SERVICE_URL
+  ) {}
 
   async createJob(params: { niches: string[]; location: string; city: string; maxPerNiche: number; withEmails: boolean }) {
     return this.jobRepo.create({
@@ -841,7 +976,23 @@ export class ScraperService {
     })
   }
 
-  async updateJobStatus(id: string, status: 'done' | 'failed') {
+  async triggerScrape(jobId: string, formData: {
+    niches: string[]; location: string; city: string;
+    maxPerNiche: number; withEmails: boolean;
+  }): Promise<{ ok: boolean; error?: string }> {
+    const resp = await fetch(`${this.scraperServiceUrl}/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId, ...formData }),
+    })
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => `HTTP ${resp.status}`)
+      return { ok: false, error: err }
+    }
+    return { ok: true }
+  }
+
+  async updateJobStatus(id: string, status: ScrapeJobStatus) {
     return this.jobRepo.update(id, {
       status,
       finished_at: new Date().toISOString(),
@@ -884,7 +1035,9 @@ export class ScraperService {
 - Keep `queries.ts` as re-exports for backward compat during migration
 
 ### Phase 3: Attio API Client
-- Create `packages/attio/` package
+- Create `packages/attio/` package with `package.json` and `tsconfig.json`
+- Add `packages/attio` to monorepo workspace config (pnpm-workspace.yaml)
+- Add `@agency-os/attio: workspace:*` dependency to dashboard's `package.json`
 - Move all Attio fetch logic into `AttioClient` class
 - Add proper types for Attio API responses
 
@@ -902,6 +1055,9 @@ export class ScraperService {
 - Remove `any` types
 - Remove old `queries.ts` functions (replaced by repositories)
 - Update component imports
+- Verify `Database` type in `types.ts` propagates correctly with enum-typed interfaces
+
+**Note:** The `Database` type (types.ts lines 154-199) references `Lead`, `Client`, etc. via `Row`/`Insert`/`Update` types. Since these interfaces are updated to use enums, the `Database` type will propagate automatically. Verify during cleanup that Supabase client type inference still works correctly.
 
 ---
 
@@ -967,4 +1123,4 @@ apps/dashboard/src/
 3. **Zod for validation** — `z.nativeEnum()` for enum validation, `safeParse` at boundaries
 4. **Date normalization in repository layer** — consistent ISO format
 5. **Attio types from codebase usage** (not full OpenAPI) — typed from actual field usage
-6. **No breaking frontend changes** — services/repos are internal, server action signatures stay compatible
+6. **Server action signatures preserved** — existing parameter signatures kept, Zod validates internally to avoid breaking frontend call sites
