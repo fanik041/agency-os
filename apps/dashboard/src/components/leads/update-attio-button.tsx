@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,7 +13,8 @@ import {
 import { compareAttioAction, updateSingleAttioEntryAction } from '@/app/leads/actions'
 import type { AttioDiffEntry } from '@/app/leads/actions'
 
-export function UpdateAttioButton() {
+export function SyncAttioButton() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [logs, setLogs] = useState<{ text: string; type: 'info' | 'success' | 'error' | 'warn' | 'done' }[]>([])
@@ -27,7 +29,7 @@ export function UpdateAttioButton() {
     setLogs(prev => [...prev, { text, type }])
   }
 
-  async function handleUpdate() {
+  async function handleSync() {
     setLoading(true)
     setLogs([])
     setStats(null)
@@ -45,7 +47,7 @@ export function UpdateAttioButton() {
         return
       }
 
-      addLog(`${compare.diffs.length} entries need updating, ${compare.unchanged} unchanged, ${compare.unmatched} not in Attio`)
+      addLog(`${compare.diffs.length} entries need syncing, ${compare.unchanged} unchanged, ${compare.unmatched} not in Attio`)
 
       if (compare.diffs.length === 0) {
         addLog('Everything is in sync!', 'done')
@@ -69,7 +71,7 @@ export function UpdateAttioButton() {
         })
 
         if (result.ok) {
-          addLog(`  Updated`, 'success')
+          addLog(`  Synced`, 'success')
           updated++
         } else {
           addLog(`  FAIL: ${result.error}`, 'error')
@@ -79,7 +81,9 @@ export function UpdateAttioButton() {
         setStats({ updated, failed, total: compare.diffs.length })
       }
 
-      addLog(`Done — ${updated} updated, ${failed} failed`, 'done')
+      addLog(`Done — ${updated} synced, ${failed} failed`, 'done')
+      // Refresh the page so Attio column statuses update
+      router.refresh()
     } catch (err) {
       addLog(`Fatal error: ${err instanceof Error ? err.message : String(err)}`, 'error')
     } finally {
@@ -97,23 +101,23 @@ export function UpdateAttioButton() {
 
   return (
     <>
-      <Button onClick={handleUpdate} disabled={loading} size="sm" variant="outline">
-        {loading ? 'Updating...' : 'Update Attio'}
+      <Button onClick={handleSync} disabled={loading} size="sm" variant="outline">
+        {loading ? 'Syncing...' : 'Sync to Attio'}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {loading ? 'Updating Attio...' : 'Update Complete'}
+              {loading ? 'Syncing to Attio...' : 'Sync Complete'}
             </DialogTitle>
             <DialogDescription>
               {loading
                 ? stats
-                  ? `Progress: ${stats.updated + stats.failed}/${stats.total} — ${stats.updated} updated, ${stats.failed} failed`
+                  ? `Progress: ${stats.updated + stats.failed}/${stats.total} — ${stats.updated} synced, ${stats.failed} failed`
                   : 'Comparing fields between Supabase and Attio...'
                 : stats
-                  ? `${stats.total} entries processed — ${stats.updated} updated, ${stats.failed} failed`
+                  ? `${stats.total} entries processed — ${stats.updated} synced, ${stats.failed} failed`
                   : 'Done'}
             </DialogDescription>
           </DialogHeader>

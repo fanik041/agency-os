@@ -6,8 +6,7 @@ import { LeadsClient } from '@/components/leads/leads-client'
 import { ImportLeadsDialog } from '@/components/leads/import-leads-dialog'
 import { AdvancedSearchDialog } from '@/components/leads/advanced-search-dialog'
 import { AttioViewerButton } from '@/components/leads/attio-viewer-button'
-import { SyncAttioButton } from '@/components/leads/sync-attio-button'
-import { UpdateAttioButton } from '@/components/leads/update-attio-button'
+import { SyncAttioButton } from '@/components/leads/update-attio-button'
 
 export default async function LeadsPage({
   searchParams,
@@ -46,7 +45,6 @@ export default async function LeadsPage({
           <AdvancedSearchDialog sources={filterOptions.sources} scrapeJobs={scrapeJobs} />
           <AttioViewerButton />
           <SyncAttioButton />
-          <UpdateAttioButton />
           <ImportLeadsDialog />
         </div>
       </div>
