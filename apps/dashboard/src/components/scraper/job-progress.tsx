@@ -93,8 +93,11 @@ function JobStatusButtons({ job }: { job: ScrapeJob }) {
   )
 }
 
+const JOBS_PER_PAGE = 5
+
 export function JobProgress({ initialJobs }: { initialJobs: ScrapeJob[] }) {
   const [jobs, setJobs] = useState(initialJobs)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     const channel = supabaseBrowser
@@ -119,17 +122,25 @@ export function JobProgress({ initialJobs }: { initialJobs: ScrapeJob[] }) {
     }
   }, [])
 
+  const totalPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE))
+  const paginatedJobs = jobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE)
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Job History</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Job History</CardTitle>
+          {jobs.length > 0 && (
+            <span className="text-xs text-muted-foreground">{jobs.length} jobs</span>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {jobs.length === 0 ? (
           <p className="text-sm text-muted-foreground">No jobs yet.</p>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => {
+            {paginatedJobs.map((job) => {
               const niches = job.niches ?? []
               const totalExpected = job.max_per_niche * niches.length
               const progress = totalExpected > 0 ? (job.leads_found / totalExpected) * 100 : 0
@@ -166,6 +177,30 @@ export function JobProgress({ initialJobs }: { initialJobs: ScrapeJob[] }) {
                 </div>
               )
             })}
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
