@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { compareAttioAction, updateSingleAttioEntryAction } from '@/app/leads/actions'
-import type { AttioDiffEntry } from '@/app/leads/actions'
 
 export function SyncAttioButton() {
   const router = useRouter()
@@ -62,12 +61,14 @@ export function SyncAttioButton() {
 
       for (let i = 0; i < compare.diffs.length; i++) {
         const entry = compare.diffs[i]
-        addLog(`[${i + 1}/${compare.diffs.length}] "${entry.leadName}" — ${entry.diffs.length} fields: ${entry.diffs.join(', ')}`, 'warn')
+        addLog(`[${i + 1}/${compare.diffs.length}] "${entry.leadName}" — ${entry.diffs.length} fields: ${entry.diffs.map(d => d.field).join(', ')}`, 'warn')
 
         const result = await updateSingleAttioEntryAction({
           leadId: entry.leadId,
+          leadName: entry.leadName,
           recordId: entry.recordId,
           entryValues: entry.entryValues,
+          changedFields: entry.diffs.map(d => d.field),
         })
 
         if (result.ok) {
