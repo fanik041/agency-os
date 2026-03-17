@@ -58,6 +58,7 @@ export function SyncAttioButton() {
       addLog('')
 
       const totalWork = compare.newEntries.length + compare.diffs.length
+      const totalLeads = compare.supabaseCount
 
       if (totalWork === 0) {
         addLog('Everything is in sync!', 'done')
@@ -79,7 +80,7 @@ export function SyncAttioButton() {
         for (let i = 0; i < compare.newEntries.length; i++) {
           const entry = compare.newEntries[i]
           progress++
-          addLog(`[${progress}/${totalWork}] CREATE "${entry.leadName}"`, 'warn')
+          addLog(`[${progress}/${totalWork}/${totalLeads}] CREATE "${entry.leadName}"`, 'warn')
 
           // Log the fields being sent
           const fieldNames = Object.keys(entry.entryValues).filter(k => k !== 'company_name')
@@ -114,7 +115,7 @@ export function SyncAttioButton() {
         for (let i = 0; i < compare.diffs.length; i++) {
           const entry = compare.diffs[i]
           progress++
-          addLog(`[${progress}/${totalWork}] UPDATE "${entry.leadName}" — ${entry.diffs.length} field(s)`, 'warn')
+          addLog(`[${progress}/${totalWork}/${totalLeads}] UPDATE "${entry.leadName}" — ${entry.diffs.length} field(s)`, 'warn')
 
           // Log each field difference with old vs new values
           for (const diff of entry.diffs) {
