@@ -1,29 +1,21 @@
 'use server'
 
-import { addRevenueEvent } from '@agency-os/db'
-import type { RevenueType } from '@agency-os/db'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
+import { container } from '@/lib/container'
+import { addRevenueEventSchema } from '@agency-os/db'
 
 export async function addRevenueEventAction(formData: FormData) {
-  const clientId = formData.get('client_id') as string
-  const type = formData.get('type') as RevenueType
-  const amount = parseFloat(formData.get('amount') as string)
-  const date = formData.get('date') as string
-  const notes = (formData.get('notes') as string) || null
+  await requireAuth()
 
-  if (!clientId || !type || isNaN(amount) || !date) {
-    throw new Error('All fields are required')
-  }
-
-  const { error } = await addRevenueEvent({
-    client_id: clientId,
-    type,
-    amount,
-    date,
-    notes,
+  const parsed = addRevenueEventSchema.parse({
+    client_id: formData.get('client_id') as string,
+    type: formData.get('type') as string,
+    amount: parseFloat(formData.get('amount') as string),
+    date: formData.get('date') as string,
+    notes: (formData.get('notes') as string) || null,
   })
 
-  if (error) throw new Error(error.message)
-
+  await container.revenueRepo.add(parsed)
   revalidatePath('/revenue')
 }
