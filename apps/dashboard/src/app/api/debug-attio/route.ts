@@ -59,7 +59,7 @@ export async function GET() {
         const group = domainCount.get(domain) ?? []
         group.push(lead.name)
         domainCount.set(domain, group)
-      } catch {}
+      } catch { /* ignore invalid URLs */ }
     }
 
     const sharedDomains = [...domainCount.entries()].filter(([, names]) => names.length > 1)
