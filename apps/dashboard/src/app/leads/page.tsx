@@ -22,7 +22,7 @@ export default async function LeadsPage({
       niche: params.niche,
       city: params.city,
       status: params.status as LeadStatus | undefined,
-      minQuality: params.min_quality ? parseInt(params.min_quality, 10) : undefined,
+      minPainScore: params.min_quality ? parseInt(params.min_quality, 10) : undefined,
       q: params.q,
       sourceId: params.source_id,
       page,
