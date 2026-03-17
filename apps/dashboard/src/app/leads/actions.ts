@@ -57,7 +57,7 @@ export async function compareAttioAction() {
     const result = await container.attioSyncService.compare()
     return { ok: true as const, ...result }
   } catch (err) {
-    return { ok: false as const, error: String(err), diffs: [], unchanged: 0, unmatched: 0, supabaseCount: 0, attioCount: 0 }
+    return { ok: false as const, error: String(err), diffs: [], newEntries: [], unchanged: 0, supabaseCount: 0, attioCount: 0 }
   }
 }
 
@@ -80,6 +80,15 @@ export async function updateSingleAttioEntryAction(entry: {
   await requireAuth()
   const parsed = updateSingleAttioEntrySchema.parse(entry)
   return container.attioSyncService.syncEntry(parsed)
+}
+
+export async function createNewAttioEntryAction(entry: {
+  leadId: string
+  leadName: string
+  entryValues: Record<string, unknown>
+}) {
+  await requireAuth()
+  return container.attioSyncService.createEntry(entry)
 }
 
 interface ParsedLead {

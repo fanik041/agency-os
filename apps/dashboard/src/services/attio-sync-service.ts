@@ -1,4 +1,4 @@
-import type { AttioClient, AttioDiffEntry, AttioDiffField } from '@agency-os/attio'
+import type { AttioClient, AttioDiffEntry, AttioDiffField, AttioNewEntry } from '@agency-os/attio'
 import type { LeadRepository } from '@agency-os/db'
 import type { Lead } from '@agency-os/db'
 import { AttioSyncStatus } from '@agency-os/db'
@@ -67,8 +67,8 @@ export class AttioSyncService {
 
   async compare(): Promise<{
     diffs: AttioDiffEntry[]
+    newEntries: AttioNewEntry[]
     unchanged: number
-    unmatched: number
     supabaseCount: number
     attioCount: number
   }> {
@@ -82,14 +82,24 @@ export class AttioSyncService {
     )
 
     const diffs: AttioDiffEntry[] = []
+    const newEntries: AttioNewEntry[] = []
     let unchanged = 0
-    let unmatched = 0
 
     for (const lead of leads) {
       const attioEntry = attioByName.get(lead.name.toLowerCase().trim())
-      if (!attioEntry) { unmatched++; continue }
-
       const desired = this.leadToAttioValues(lead)
+
+      if (!attioEntry) {
+        // Lead exists in Supabase but not in Attio — needs to be created
+        newEntries.push({
+          leadId: lead.id,
+          leadName: lead.name,
+          entryValues: desired,
+        })
+        continue
+      }
+
+      // Lead exists in both — compare field by field
       const diffFields: AttioDiffField[] = []
 
       for (const [key, desiredVal] of Object.entries(desired)) {
@@ -111,7 +121,7 @@ export class AttioSyncService {
       })
     }
 
-    return { diffs, unchanged, unmatched, supabaseCount: leads.length, attioCount: attioEntries.length }
+    return { diffs, newEntries, unchanged, supabaseCount: leads.length, attioCount: attioEntries.length }
   }
 
   async syncEntry(entry: {
@@ -128,6 +138,27 @@ export class AttioSyncService {
 
     try {
       await this.attioClient.upsertEntry(entry.recordId, patchValues)
+      await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Synced)
+      return { ok: true }
+    } catch (err) {
+      await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Failed).catch(() => {})
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async createEntry(entry: {
+    leadId: string
+    leadName: string
+    entryValues: Record<string, unknown>
+  }): Promise<{ ok: boolean; error?: string }> {
+    try {
+      // Step 1: Assert/create the company record in Attio, get its record ID
+      const recordId = await this.attioClient.assertCompany(entry.leadName)
+
+      // Step 2: Add/update the list entry with all field values
+      await this.attioClient.upsertEntry(recordId, entry.entryValues)
+
+      // Step 3: Mark as synced in Supabase
       await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Synced)
       return { ok: true }
     } catch (err) {

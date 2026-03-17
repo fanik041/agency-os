@@ -34,3 +34,9 @@ export interface AttioDiffEntry {
   diffs: AttioDiffField[]
   entryValues: Record<string, unknown>
 }
+
+export interface AttioNewEntry {
+  leadId: string
+  leadName: string
+  entryValues: Record<string, unknown>
+}

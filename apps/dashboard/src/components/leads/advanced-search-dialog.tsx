@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -76,6 +77,7 @@ export function AdvancedSearchDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Advanced Search</DialogTitle>
+          <DialogDescription className="sr-only">Filter leads by job history or niche</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="jobs">

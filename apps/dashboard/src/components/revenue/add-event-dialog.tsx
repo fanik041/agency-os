@@ -5,6 +5,7 @@ import type { Client } from '@agency-os/db'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -50,6 +51,7 @@ export function AddEventDialog({ clients }: { clients: Client[] }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add Revenue Event</DialogTitle>
+          <DialogDescription className="sr-only">Record a new revenue event for a client</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-3">
           <div className="space-y-1">

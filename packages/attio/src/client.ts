@@ -75,6 +75,29 @@ export class AttioClient {
     }
   }
 
+  async assertCompany(name: string): Promise<string> {
+    const resp = await fetch(`${this.baseUrl}/objects/companies/records`, {
+      method: 'PUT',
+      headers: this.headers,
+      body: JSON.stringify({
+        data: {
+          values: {
+            name: [{ value: name }],
+          },
+        },
+        matching_attribute: 'name',
+      }),
+    })
+    if (!resp.ok) {
+      const errData = (await resp.json().catch(() => null)) as { message?: string } | null
+      throw new Error(`Failed to assert company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
+    }
+    const data = (await resp.json()) as { data?: { id?: { record_id?: string } } }
+    const recordId = data.data?.id?.record_id
+    if (!recordId) throw new Error(`No record_id returned for company "${name}"`)
+    return recordId
+  }
+
   async deleteEntry(entryId: string): Promise<void> {
     const resp = await fetch(`${this.baseUrl}/lists/${this.listId}/entries/${entryId}`, {
       method: 'DELETE',

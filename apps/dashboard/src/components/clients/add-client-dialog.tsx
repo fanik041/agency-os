@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -41,6 +42,7 @@ export function AddClientDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
+          <DialogDescription className="sr-only">Enter details to create a new client</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-3">
           <div className="space-y-1">

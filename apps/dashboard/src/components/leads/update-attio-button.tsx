@@ -10,21 +10,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { compareAttioAction, updateSingleAttioEntryAction } from '@/app/leads/actions'
+import { compareAttioAction, updateSingleAttioEntryAction, createNewAttioEntryAction } from '@/app/leads/actions'
+
+type LogType = 'info' | 'success' | 'error' | 'warn' | 'done' | 'detail'
 
 export function SyncAttioButton() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [logs, setLogs] = useState<{ text: string; type: 'info' | 'success' | 'error' | 'warn' | 'done' }[]>([])
-  const [stats, setStats] = useState<{ updated: number; failed: number; total: number } | null>(null)
+  const [logs, setLogs] = useState<{ text: string; type: LogType }[]>([])
+  const [stats, setStats] = useState<{
+    created: number; updated: number; failed: number; total: number
+  } | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  const addLog = (text: string, type: 'info' | 'success' | 'error' | 'warn' | 'done' = 'info') => {
+  const addLog = (text: string, type: LogType = 'info') => {
     setLogs(prev => [...prev, { text, type }])
   }
 
@@ -34,10 +38,9 @@ export function SyncAttioButton() {
     setStats(null)
     setOpen(true)
 
-    addLog('Comparing Supabase with Attio...')
+    addLog('Step 1: Fetching leads from Supabase and entries from Attio...')
 
     try {
-      // Step 1: Compare
       const compare = await compareAttioAction()
 
       if (!compare.ok) {
@@ -46,44 +49,99 @@ export function SyncAttioButton() {
         return
       }
 
-      addLog(`${compare.diffs.length} entries need syncing, ${compare.unchanged} unchanged, ${compare.unmatched} not in Attio`)
+      // Detailed count summary
+      addLog(`Supabase: ${compare.supabaseCount} leads`, 'info')
+      addLog(`Attio: ${compare.attioCount} entries`, 'info')
+      addLog(`Matched & unchanged: ${compare.unchanged}`, 'info')
+      addLog(`Matched & need updating: ${compare.diffs.length}`, compare.diffs.length > 0 ? 'warn' : 'info')
+      addLog(`Missing from Attio (new): ${compare.newEntries.length}`, compare.newEntries.length > 0 ? 'warn' : 'info')
+      addLog('')
 
-      if (compare.diffs.length === 0) {
+      const totalWork = compare.newEntries.length + compare.diffs.length
+
+      if (totalWork === 0) {
         addLog('Everything is in sync!', 'done')
-        setStats({ updated: 0, failed: 0, total: 0 })
+        setStats({ created: 0, updated: 0, failed: 0, total: 0 })
         setLoading(false)
         return
       }
 
-      // Step 2: Update one at a time with live progress
+      let created = 0
       let updated = 0
       let failed = 0
+      let progress = 0
 
-      for (let i = 0; i < compare.diffs.length; i++) {
-        const entry = compare.diffs[i]
-        addLog(`[${i + 1}/${compare.diffs.length}] "${entry.leadName}" — ${entry.diffs.length} fields: ${entry.diffs.map(d => d.field).join(', ')}`, 'warn')
+      // Phase 1: Create new entries in Attio
+      if (compare.newEntries.length > 0) {
+        addLog(`Step 2: Creating ${compare.newEntries.length} new companies in Attio...`)
+        addLog('')
 
-        const result = await updateSingleAttioEntryAction({
-          leadId: entry.leadId,
-          leadName: entry.leadName,
-          recordId: entry.recordId,
-          entryValues: entry.entryValues,
-          changedFields: entry.diffs.map(d => d.field),
-        })
+        for (let i = 0; i < compare.newEntries.length; i++) {
+          const entry = compare.newEntries[i]
+          progress++
+          addLog(`[${progress}/${totalWork}] CREATE "${entry.leadName}"`, 'warn')
 
-        if (result.ok) {
-          addLog(`  Synced`, 'success')
-          updated++
-        } else {
-          addLog(`  FAIL: ${result.error}`, 'error')
-          failed++
+          // Log the fields being sent
+          const fieldNames = Object.keys(entry.entryValues).filter(k => k !== 'company_name')
+          addLog(`  Fields: ${fieldNames.join(', ')}`, 'detail')
+
+          const result = await createNewAttioEntryAction({
+            leadId: entry.leadId,
+            leadName: entry.leadName,
+            entryValues: entry.entryValues,
+          })
+
+          if (result.ok) {
+            addLog(`  Created successfully`, 'success')
+            created++
+          } else {
+            addLog(`  FAILED: ${result.error}`, 'error')
+            failed++
+          }
+
+          setStats({ created, updated, failed, total: totalWork })
         }
 
-        setStats({ updated, failed, total: compare.diffs.length })
+        addLog('')
       }
 
-      addLog(`Done — ${updated} synced, ${failed} failed`, 'done')
-      // Refresh the page so Attio column statuses update
+      // Phase 2: Update existing entries with mismatched fields
+      if (compare.diffs.length > 0) {
+        addLog(`Step ${compare.newEntries.length > 0 ? '3' : '2'}: Updating ${compare.diffs.length} entries with field differences...`)
+        addLog('')
+
+        for (let i = 0; i < compare.diffs.length; i++) {
+          const entry = compare.diffs[i]
+          progress++
+          addLog(`[${progress}/${totalWork}] UPDATE "${entry.leadName}" — ${entry.diffs.length} field(s)`, 'warn')
+
+          // Log each field difference with old vs new values
+          for (const diff of entry.diffs) {
+            addLog(`  ${diff.field}: "${diff.attio}" → "${diff.supabase}"`, 'detail')
+          }
+
+          const result = await updateSingleAttioEntryAction({
+            leadId: entry.leadId,
+            leadName: entry.leadName,
+            recordId: entry.recordId,
+            entryValues: entry.entryValues,
+            changedFields: entry.diffs.map(d => d.field),
+          })
+
+          if (result.ok) {
+            addLog(`  Synced`, 'success')
+            updated++
+          } else {
+            addLog(`  FAILED: ${result.error}`, 'error')
+            failed++
+          }
+
+          setStats({ created, updated, failed, total: totalWork })
+        }
+      }
+
+      addLog('')
+      addLog(`Sync complete — ${created} created, ${updated} updated, ${failed} failed`, 'done')
       router.refresh()
     } catch (err) {
       addLog(`Fatal error: ${err instanceof Error ? err.message : String(err)}`, 'error')
@@ -92,12 +150,22 @@ export function SyncAttioButton() {
     }
   }
 
-  const colorMap = {
+  const colorMap: Record<LogType, string> = {
     info: 'text-zinc-300',
     success: 'text-green-400',
     error: 'text-red-400',
     warn: 'text-yellow-400',
     done: 'text-blue-400 font-bold',
+    detail: 'text-zinc-500',
+  }
+
+  const progressText = () => {
+    if (!loading) {
+      if (!stats) return 'Done'
+      return `${stats.total} processed — ${stats.created} created, ${stats.updated} updated, ${stats.failed} failed`
+    }
+    if (!stats) return 'Comparing Supabase and Attio...'
+    return `Progress: ${stats.created + stats.updated + stats.failed}/${stats.total} — ${stats.created} created, ${stats.updated} updated, ${stats.failed} failed`
   }
 
   return (
@@ -113,13 +181,7 @@ export function SyncAttioButton() {
               {loading ? 'Syncing to Attio...' : 'Sync Complete'}
             </DialogTitle>
             <DialogDescription>
-              {loading
-                ? stats
-                  ? `Progress: ${stats.updated + stats.failed}/${stats.total} — ${stats.updated} synced, ${stats.failed} failed`
-                  : 'Comparing fields between Supabase and Attio...'
-                : stats
-                  ? `${stats.total} entries processed — ${stats.updated} synced, ${stats.failed} failed`
-                  : 'Done'}
+              {progressText()}
             </DialogDescription>
           </DialogHeader>
 

@@ -1,2 +1,2 @@
 export { AttioClient } from './client'
-export type { AttioEntry, AttioListEntry, AttioSelfResponse, AttioDiffField, AttioDiffEntry } from './types'
+export type { AttioEntry, AttioListEntry, AttioSelfResponse, AttioDiffField, AttioDiffEntry, AttioNewEntry } from './types'

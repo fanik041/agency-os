@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -75,6 +76,7 @@ export function DeploySiteDialog({ client }: { client?: Client }) {
           <DialogTitle>
             {activeClient ? `Deploy Site — ${activeClient.business_name}` : 'Deploy Site'}
           </DialogTitle>
+          <DialogDescription className="sr-only">Configure and deploy a new client site</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-3">
           {!client && (
