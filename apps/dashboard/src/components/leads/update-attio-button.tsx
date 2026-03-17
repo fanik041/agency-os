@@ -88,6 +88,7 @@ export function SyncAttioButton() {
           const result = await createNewAttioEntryAction({
             leadId: entry.leadId,
             leadName: entry.leadName,
+            domain: entry.domain,
             entryValues: entry.entryValues,
           })
 

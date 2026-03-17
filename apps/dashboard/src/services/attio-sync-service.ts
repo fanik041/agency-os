@@ -94,6 +94,7 @@ export class AttioSyncService {
         newEntries.push({
           leadId: lead.id,
           leadName: lead.name,
+          domain: this.extractDomain(lead.website),
           entryValues: desired,
         })
         continue
@@ -149,11 +150,12 @@ export class AttioSyncService {
   async createEntry(entry: {
     leadId: string
     leadName: string
+    domain?: string
     entryValues: Record<string, unknown>
   }): Promise<{ ok: boolean; error?: string }> {
     try {
       // Step 1: Assert/create the company record in Attio, get its record ID
-      const recordId = await this.attioClient.assertCompany(entry.leadName)
+      const recordId = await this.attioClient.assertCompany(entry.leadName, entry.domain)
 
       // Step 2: Add/update the list entry with all field values
       await this.attioClient.upsertEntry(recordId, entry.entryValues)
@@ -195,5 +197,15 @@ export class AttioSyncService {
     if (lead.address) v.address = lead.address
     if (lead.maps_url) v.maps_url = lead.maps_url
     return v
+  }
+
+  private extractDomain(website: string | null): string | undefined {
+    if (!website) return undefined
+    try {
+      const url = new URL(website.startsWith('http') ? website : `https://${website}`)
+      return url.hostname.replace(/^www\./, '')
+    } catch {
+      return undefined
+    }
   }
 }

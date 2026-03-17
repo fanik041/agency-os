@@ -85,6 +85,7 @@ export async function updateSingleAttioEntryAction(entry: {
 export async function createNewAttioEntryAction(entry: {
   leadId: string
   leadName: string
+  domain?: string
   entryValues: Record<string, unknown>
 }) {
   await requireAuth()

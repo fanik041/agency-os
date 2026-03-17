@@ -38,5 +38,6 @@ export interface AttioDiffEntry {
 export interface AttioNewEntry {
   leadId: string
   leadName: string
+  domain?: string
   entryValues: Record<string, unknown>
 }

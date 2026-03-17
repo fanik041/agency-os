@@ -75,9 +75,37 @@ export class AttioClient {
     }
   }
 
-  async assertCompany(name: string): Promise<string> {
+  async assertCompany(name: string, domain?: string): Promise<string> {
+    // If we have a domain, use PUT assert with domains as matching_attribute (query param)
+    // If no domain, use POST to create a new company record
+    if (domain) {
+      const url = new URL(`${this.baseUrl}/objects/companies/records`)
+      url.searchParams.set('matching_attribute', 'domains')
+      const resp = await fetch(url.toString(), {
+        method: 'PUT',
+        headers: this.headers,
+        body: JSON.stringify({
+          data: {
+            values: {
+              name: [{ value: name }],
+              domains: [{ domain }],
+            },
+          },
+        }),
+      })
+      if (!resp.ok) {
+        const errData = (await resp.json().catch(() => null)) as { message?: string } | null
+        throw new Error(`Failed to assert company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
+      }
+      const data = (await resp.json()) as { data?: { id?: { record_id?: string } } }
+      const recordId = data.data?.id?.record_id
+      if (!recordId) throw new Error(`No record_id returned for company "${name}"`)
+      return recordId
+    }
+
+    // No domain — create new company record directly
     const resp = await fetch(`${this.baseUrl}/objects/companies/records`, {
-      method: 'PUT',
+      method: 'POST',
       headers: this.headers,
       body: JSON.stringify({
         data: {
@@ -85,12 +113,11 @@ export class AttioClient {
             name: [{ value: name }],
           },
         },
-        matching_attribute: 'name',
       }),
     })
     if (!resp.ok) {
       const errData = (await resp.json().catch(() => null)) as { message?: string } | null
-      throw new Error(`Failed to assert company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
+      throw new Error(`Failed to create company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
     }
     const data = (await resp.json()) as { data?: { id?: { record_id?: string } } }
     const recordId = data.data?.id?.record_id
