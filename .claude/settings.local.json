@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest:*)",
+      "Bash(curl -s http://localhost:3001/health 2>&1 || echo \"UNREACHABLE\")",
+      "Bash(curl -s -N http://localhost:3001/attio/sync -X POST -H \"Content-Type: application/json\" 2>&1 | head -20)",
+      "Bash(curl -s -N http://localhost:3001/attio/sync -X POST -H \"Content-Type: application/json\" -H \"Authorization: Bearer 3f99d9b692f441352ad74f01f0d2bea23e5ac1f40f294240c3ae2ac2d84f96e1\" 2>&1 | head -20)",
+      "Bash(curl -s -N http://localhost:3000/api/attio/sync -X POST 2>&1 | head -20)",
+      "Bash(curl -s http://localhost:3001/attio/sync -X POST -H \"Authorization: Bearer 3f99d9b692f441352ad74f01f0d2bea23e5ac1f40f294240c3ae2ac2d84f96e1\" -H \"Content-Type: application/json\" -w \"\\\\n--- HTTP %{http_code}, Content-Type: %{content_type} ---\" 2>&1 | head -10)",
+      "Bash(curl -s https://api.attio.com/v2/objects/companies/records -X PUT \\\\\n  -H \"Authorization: Bearer 36132db0f76cee8796130b1cec0af1390a35d3e93a0dcfdd79587bda28115eb5\" \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -d '{\"data\":{\"values\":{\"name\":[{\"value\":\"Test No Domain\"}]}}}' \\\\\n  --url-query \"matching_attribute=name\" 2>&1 | python3 -m json.tool)"
+    ]
+  }
+}

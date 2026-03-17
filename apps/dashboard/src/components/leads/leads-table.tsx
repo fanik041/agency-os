@@ -75,12 +75,13 @@ export function LeadsTable({
             <TableHead className="w-[18%]">Name</TableHead>
             <TableHead className="w-[9%]">Phone</TableHead>
             <TableHead className="w-[7%]">Niche</TableHead>
-            <TableHead className="w-[11%]">Email</TableHead>
-            <TableHead className="w-[15%]">Place ID</TableHead>
+            <TableHead className="w-[9%]">Email</TableHead>
+            <TableHead className="w-[12%]">Place ID</TableHead>
             <TableHead className="text-center w-[5%]">Rating</TableHead>
             <TableHead className="text-center w-[5%]">Count</TableHead>
             <TableHead className="text-center w-[4%]">Pain</TableHead>
             <TableHead className="w-[8%]">Status</TableHead>
+            <TableHead className="w-[6%]">Attio</TableHead>
             <TableHead className="text-center w-[4%]">Reviews</TableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -88,7 +89,7 @@ export function LeadsTable({
         <TableBody>
           {leads.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={12} className="text-center text-muted-foreground">
+              <TableCell colSpan={13} className="text-center text-muted-foreground">
                 No leads found. Run a scrape to get started.
               </TableCell>
             </TableRow>
@@ -177,6 +178,14 @@ function LeadRow({
             {LEAD_STATUS_LABELS[lead.status]}
           </Badge>
         </TableCell>
+        <TableCell>
+          <Badge
+            variant="secondary"
+            className={lead.attio_sync_status === 'synced' ? 'bg-green-500/15 text-green-500' : 'bg-zinc-500/15 text-zinc-400'}
+          >
+            {lead.attio_sync_status === 'synced' ? 'Synced' : 'Not Synced'}
+          </Badge>
+        </TableCell>
         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
           {reviews.length > 0 ? (
             <Button
@@ -214,7 +223,7 @@ function LeadRow({
       </TableRow>
       {reviewsOpen && reviews.length > 0 && (
         <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableCell colSpan={12} className="py-2 px-6">
+          <TableCell colSpan={13} className="py-2 px-6">
             <div className="max-h-48 overflow-auto space-y-1.5 text-xs">
               {reviews.map((review, i) => (
                 <div key={i} className="flex gap-2">

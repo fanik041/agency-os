@@ -33,6 +33,13 @@ export async function getLeads(filters?: {
   return query
 }
 
+export async function getLeadCount() {
+  const { count, error } = await supabaseAdmin
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+  return { count: count ?? 0, error }
+}
+
 // LEAD FILTER OPTIONS (distinct niches, cities, sources)
 export async function getLeadFilterOptions() {
   const [nichesRes, citiesRes, sourcesRes] = await Promise.all([
@@ -102,6 +109,14 @@ export async function updateLeadStatus(id: string, status: LeadStatus, notes?: s
     .eq('id', id)
     .select()
     .single()
+}
+
+export async function getUnsyncedLeads() {
+  return supabaseAdmin
+    .from('leads')
+    .select('*')
+    .eq('attio_sync_status', 'not_synced')
+    .order('created_at', { ascending: false })
 }
 
 export async function updateLeadAttioSync(id: string, syncStatus: AttioSyncStatus) {
@@ -262,6 +277,13 @@ export async function linkContactToLead(contactId: string, leadId: string | null
     .eq('id', contactId)
     .select('*, leads(name, niche, city)')
     .single()
+}
+
+export async function getAllLeadsFull() {
+  return supabaseAdmin
+    .from('leads')
+    .select('*')
+    .order('created_at', { ascending: false })
 }
 
 export async function getAllLeadsMinimal() {

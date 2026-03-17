@@ -1,6 +1,6 @@
 'use server'
 
-import { updateLeadStatus, logCall, bulkUpsertLeads, createLeadSource, updateLeadSourceCount } from '@agency-os/db'
+import { updateLeadStatus, logCall, bulkUpsertLeads, createLeadSource, updateLeadSourceCount, getUnsyncedLeads, updateLeadAttioSync, getAllLeadsFull } from '@agency-os/db'
 import type { CallOutcome, LeadStatus, Lead } from '@agency-os/db'
 import { revalidatePath } from 'next/cache'
 
@@ -36,6 +36,466 @@ export async function logCallAction(
   if (statusResult.error) throw new Error(statusResult.error.message)
 
   revalidatePath('/leads')
+}
+
+export async function fetchAttioEntriesAction(): Promise<{
+  ok: boolean
+  error?: string
+  workspace?: string
+  listName?: string
+  entries: { company_name: string; values: Record<string, unknown> }[]
+}> {
+  const apiKey = process.env.ATTIO_API_KEY
+  const listId = process.env.ATTIO_LIST_ID
+
+  console.log('[attio] fetchAttioEntries called, apiKey:', apiKey ? 'set' : 'missing', 'listId:', listId ?? 'missing')
+
+  if (!apiKey || !listId) {
+    return { ok: false, error: 'ATTIO_API_KEY and ATTIO_LIST_ID must be set', entries: [] }
+  }
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+
+  try {
+    // 1. Verify connection
+    const selfResp = await fetch('https://api.attio.com/v2/self', { headers })
+    if (!selfResp.ok) {
+      return { ok: false, error: `Auth failed: HTTP ${selfResp.status}`, entries: [] }
+    }
+    const selfData = await selfResp.json()
+    const workspace = selfData?.data?.workspace?.name ?? 'Unknown'
+    console.log('[attio] Connected to workspace:', workspace)
+
+    // 2. Get list name
+    const listResp = await fetch(`https://api.attio.com/v2/lists/${listId}`, { headers })
+    const listData = listResp.ok ? await listResp.json() : null
+    const listName = listData?.data?.name ?? listId
+    console.log('[attio] List name:', listName)
+
+    // 3. Fetch all entries (paginate through all pages)
+    const rawEntries: any[] = []
+    let offset = 0
+    const pageSize = 500
+
+    while (true) {
+      const entriesResp = await fetch(`https://api.attio.com/v2/lists/${listId}/entries/query`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ limit: pageSize, offset }),
+      })
+
+      if (!entriesResp.ok) {
+        const errData = await entriesResp.json().catch(() => null)
+        return { ok: false, error: `Failed to fetch entries: ${errData?.message ?? entriesResp.status}`, entries: [] }
+      }
+
+      const entriesData = await entriesResp.json()
+      const page = entriesData?.data ?? []
+      rawEntries.push(...page)
+      console.log('[attio] Fetched page at offset', offset, '—', page.length, 'entries')
+
+      if (page.length < pageSize) break
+      offset += pageSize
+    }
+
+    console.log('[attio] Total entries fetched:', rawEntries.length)
+
+    const entries = rawEntries.map((e: any) => {
+      const vals = e.entry_values ?? {}
+      const companyName = vals.company_name?.[0]?.value ?? vals.name?.[0]?.value ?? '(unnamed)'
+      // Flatten each attribute to its first value for display
+      const flat: Record<string, unknown> = {}
+      for (const [key, arr] of Object.entries(vals)) {
+        if (Array.isArray(arr) && arr.length > 0) {
+          flat[key] = (arr[0] as any).value ?? (arr[0] as any).domain ?? JSON.stringify(arr[0])
+        }
+      }
+      return { company_name: companyName, values: flat }
+    })
+
+    return { ok: true, workspace, listName, entries }
+  } catch (err) {
+    console.error('[attio] Error:', err)
+    return { ok: false, error: `Connection failed: ${err instanceof Error ? err.message : err}`, entries: [] }
+  }
+}
+
+const ATTIO_BASE = 'https://api.attio.com/v2'
+
+const STATUS_MAP: Record<string, string> = {
+  new: 'New', scoring: 'Scoring', needs_review: 'Needs Review',
+  approved: 'Approved', sent: 'Sent', replied: 'Replied',
+  booked: 'Booked', closed: 'Closed', skip: 'Skip',
+}
+
+function normalizeDomain(website: string | null): string | null {
+  if (!website) return null
+  const domain = website
+    .replace(/https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/[?#].*$/, '')
+    .replace(/:\d+/, '')
+    .replace(/\/.*$/, '')
+    .toLowerCase()
+    .trim()
+  return domain || null
+}
+
+export async function syncToAttioAction(): Promise<{
+  ok: boolean
+  error?: string
+  logs: string[]
+  stats: { total: number; pushed: number; skipped: number; failed: number }
+}> {
+  const apiKey = process.env.ATTIO_API_KEY
+  const listId = process.env.ATTIO_LIST_ID
+  const logs: string[] = []
+  const log = (msg: string) => { logs.push(msg); console.log('[attio-sync]', msg) }
+
+  if (!apiKey || !listId) {
+    return { ok: false, error: 'ATTIO_API_KEY and ATTIO_LIST_ID must be set', logs: [], stats: { total: 0, pushed: 0, skipped: 0, failed: 0 } }
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+
+  try {
+    // 1. Fetch all existing Attio entries to know what's already there
+    log('Fetching existing Attio entries...')
+    const attioNames = new Set<string>()
+    let offset = 0
+    while (true) {
+      const resp = await fetch(`${ATTIO_BASE}/lists/${listId}/entries/query`, {
+        method: 'POST', headers, body: JSON.stringify({ limit: 500, offset }),
+      })
+      if (!resp.ok) {
+        return { ok: false, error: `Failed to fetch Attio entries: HTTP ${resp.status}`, logs, stats: { total: 0, pushed: 0, skipped: 0, failed: 0 } }
+      }
+      const data = await resp.json()
+      const page = data?.data ?? []
+      for (const entry of page) {
+        const name = entry.entry_values?.company_name?.[0]?.value
+        if (name) attioNames.add(name.toLowerCase().trim())
+      }
+      if (page.length < 500) break
+      offset += 500
+    }
+    log(`Found ${attioNames.size} existing entries in Attio`)
+
+    // 2. Fetch unsynced leads from Supabase
+    const { data: leads, error: dbError } = await getUnsyncedLeads()
+    if (dbError || !leads) {
+      return { ok: false, error: `DB error: ${dbError?.message}`, logs, stats: { total: 0, pushed: 0, skipped: 0, failed: 0 } }
+    }
+    log(`Found ${leads.length} unsynced leads in Supabase`)
+
+    // 3. Compare and find missing
+    const missing = leads.filter(l => !attioNames.has(l.name.toLowerCase().trim()))
+    const skipped = leads.length - missing.length
+    log(`${missing.length} missing in Attio, ${skipped} already exist`)
+
+    if (missing.length === 0) {
+      // Mark all as synced since they exist in Attio
+      for (const lead of leads) {
+        await updateLeadAttioSync(lead.id, 'synced').catch(() => {})
+      }
+      revalidatePath('/leads')
+      return { ok: true, logs, stats: { total: leads.length, pushed: 0, skipped, failed: 0 } }
+    }
+
+    // 4. Push missing leads to Attio
+    let pushed = 0
+    let failed = 0
+
+    for (let i = 0; i < missing.length; i++) {
+      const lead = missing[i]
+      log(`[${i + 1}/${missing.length}] Pushing "${lead.name}"...`)
+
+      try {
+        // Step A: Upsert company record
+        const domain = normalizeDomain(lead.website)
+        const companyValues: Record<string, unknown> = { name: [{ value: lead.name }] }
+        if (domain) companyValues.domains = [{ domain }]
+
+        let companyResp
+        if (domain) {
+          companyResp = await fetch(`${ATTIO_BASE}/objects/companies/records?matching_attribute=domains`, {
+            method: 'PUT', headers, body: JSON.stringify({ data: { values: companyValues } }),
+          })
+        } else {
+          // Search by name first to avoid duplicates
+          const searchResp = await fetch(`${ATTIO_BASE}/objects/companies/records/query`, {
+            method: 'POST', headers, body: JSON.stringify({ filter: { name: { $eq: lead.name } }, limit: 1 }),
+          })
+          const searchData = searchResp.ok ? await searchResp.json() : null
+          if (searchData?.data?.length > 0) {
+            companyResp = { ok: true, json: async () => ({ data: searchData.data[0] }) } as any
+            log(`  Found existing company by name`)
+          } else {
+            companyResp = await fetch(`${ATTIO_BASE}/objects/companies/records`, {
+              method: 'POST', headers, body: JSON.stringify({ data: { values: companyValues } }),
+            })
+          }
+        }
+
+        if (!companyResp.ok) {
+          const err = await companyResp.json().catch(() => null)
+          log(`  FAIL company: ${err?.message ?? companyResp.status}`)
+          failed++
+          await updateLeadAttioSync(lead.id, 'failed').catch(() => {})
+          continue
+        }
+
+        const companyData = await companyResp.json()
+        const recordId = companyData?.data?.id?.record_id
+        if (!recordId) {
+          log(`  FAIL: no record_id returned`)
+          failed++
+          await updateLeadAttioSync(lead.id, 'failed').catch(() => {})
+          continue
+        }
+
+        // Step B: Add to list with entry values
+        const entryValues: Record<string, unknown> = { company_name: lead.name }
+        if (lead.website) entryValues.website = lead.website
+        if (lead.phone) entryValues.phone = lead.phone
+        if (lead.place_id) entryValues.place_id = lead.place_id
+        if (lead.reviews_raw) entryValues.reviews_raw = lead.reviews_raw
+        if (lead.pain_points) entryValues.pain_points = lead.pain_points
+        if (lead.suggested_angle) entryValues.suggested_angle = lead.suggested_angle
+        if (lead.message_draft) entryValues.message_draft = lead.message_draft
+        if (lead.email_found) entryValues.email_found = lead.email_found
+        if (lead.notes) entryValues.notes = lead.notes
+        entryValues.has_booking = lead.has_booking
+        entryValues.has_chat_widget = lead.has_chat_widget
+        entryValues.has_contact_form = lead.has_contact_form
+        if (lead.pain_score != null) entryValues.pain_score = lead.pain_score
+        if (lead.review_count != null) entryValues.review_count = lead.review_count
+        if (lead.rating != null) entryValues.rating = lead.rating
+        if (lead.analyze) entryValues.analyze = lead.analyze
+        if (lead.status && STATUS_MAP[lead.status]) entryValues.status = STATUS_MAP[lead.status]
+        if (lead.follow_up_date) entryValues.follow_up_date = lead.follow_up_date
+        if (lead.niche) entryValues.niche = lead.niche
+        if (lead.city) entryValues.city = lead.city
+        if (lead.address) entryValues.address = lead.address
+        if (lead.maps_url) entryValues.maps_url = lead.maps_url
+
+        const entryResp = await fetch(`${ATTIO_BASE}/lists/${listId}/entries`, {
+          method: 'PUT', headers,
+          body: JSON.stringify({ data: { parent_record_id: recordId, parent_object: 'companies', entry_values: entryValues } }),
+        })
+
+        if (!entryResp.ok) {
+          const err = await entryResp.json().catch(() => null)
+          log(`  FAIL list entry: ${err?.message ?? entryResp.status}`)
+          failed++
+          await updateLeadAttioSync(lead.id, 'failed').catch(() => {})
+          continue
+        }
+
+        log(`  OK`)
+        pushed++
+        await updateLeadAttioSync(lead.id, 'synced').catch(() => {})
+      } catch (err) {
+        log(`  ERROR: ${err instanceof Error ? err.message : err}`)
+        failed++
+        await updateLeadAttioSync(lead.id, 'failed').catch(() => {})
+      }
+
+      // Rate limit
+      if (i < missing.length - 1) await new Promise(r => setTimeout(r, 200))
+    }
+
+    log(`Done — ${pushed} pushed, ${failed} failed, ${skipped} already existed`)
+    revalidatePath('/leads')
+    return { ok: true, logs, stats: { total: leads.length, pushed, skipped, failed } }
+  } catch (err) {
+    log(`Fatal error: ${err instanceof Error ? err.message : err}`)
+    return { ok: false, error: String(err), logs, stats: { total: 0, pushed: 0, skipped: 0, failed: 0 } }
+  }
+}
+
+/** Build the Attio entry_values object from a Supabase lead */
+function leadToAttioValues(lead: Lead): Record<string, unknown> {
+  const v: Record<string, unknown> = { company_name: lead.name }
+  if (lead.website) v.website = lead.website
+  if (lead.phone) v.phone = lead.phone
+  if (lead.place_id) v.place_id = lead.place_id
+  if (lead.reviews_raw) v.reviews_raw = lead.reviews_raw
+  if (lead.pain_points) v.pain_points = lead.pain_points
+  if (lead.suggested_angle) v.suggested_angle = lead.suggested_angle
+  if (lead.message_draft) v.message_draft = lead.message_draft
+  if (lead.email_found) v.email_found = lead.email_found
+  if (lead.notes) v.notes = lead.notes
+  v.has_booking = lead.has_booking
+  v.has_chat_widget = lead.has_chat_widget
+  v.has_contact_form = lead.has_contact_form
+  if (lead.pain_score != null) v.pain_score = lead.pain_score
+  // Always include review_count and rating (send as number, never skip)
+  v.review_count = lead.review_count ?? 0
+  v.rating = lead.rating ?? null
+  if (lead.analyze) v.analyze = lead.analyze
+  if (lead.status && STATUS_MAP[lead.status]) v.status = STATUS_MAP[lead.status]
+  if (lead.follow_up_date) v.follow_up_date = lead.follow_up_date
+  if (lead.niche) v.niche = lead.niche
+  if (lead.city) v.city = lead.city
+  if (lead.address) v.address = lead.address
+  if (lead.maps_url) v.maps_url = lead.maps_url
+  return v
+}
+
+/** Extract scalar value from Attio's array-wrapped entry_values */
+function attioVal(arr: unknown): unknown {
+  if (!Array.isArray(arr) || arr.length === 0) return undefined
+  const first = arr[0] as any
+  if (first.value !== undefined) return first.value
+  if (first.domain !== undefined) return first.domain
+  if (first.option !== undefined) return first.option
+  return undefined
+}
+
+export interface AttioDiffEntry {
+  leadId: string
+  leadName: string
+  recordId: string
+  diffs: string[]
+  entryValues: Record<string, unknown>
+}
+
+/** Step 1: Compare Supabase leads with Attio entries, return the diff list */
+export async function compareAttioAction(): Promise<{
+  ok: boolean
+  error?: string
+  diffs: AttioDiffEntry[]
+  unchanged: number
+  unmatched: number
+}> {
+  const apiKey = process.env.ATTIO_API_KEY
+  const listId = process.env.ATTIO_LIST_ID
+
+  if (!apiKey || !listId) {
+    return { ok: false, error: 'ATTIO_API_KEY and ATTIO_LIST_ID must be set', diffs: [], unchanged: 0, unmatched: 0 }
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+
+  try {
+    // Fetch all Attio entries
+    console.log('[attio-compare] Fetching Attio entries...')
+    const attioEntries: { recordId: string; name: string; values: Record<string, unknown> }[] = []
+    let offset = 0
+    while (true) {
+      const resp = await fetch(`${ATTIO_BASE}/lists/${listId}/entries/query`, {
+        method: 'POST', headers, body: JSON.stringify({ limit: 500, offset }),
+      })
+      if (!resp.ok) return { ok: false, error: `Failed to fetch Attio: HTTP ${resp.status}`, diffs: [], unchanged: 0, unmatched: 0 }
+      const data = await resp.json()
+      const page = data?.data ?? []
+      for (const entry of page) {
+        const vals = entry.entry_values ?? {}
+        const name = vals.company_name?.[0]?.value ?? vals.name?.[0]?.value ?? ''
+        const flat: Record<string, unknown> = {}
+        for (const [key, arr] of Object.entries(vals)) {
+          flat[key] = attioVal(arr)
+        }
+        attioEntries.push({ recordId: entry.parent_record_id, name, values: flat })
+      }
+      if (page.length < 500) break
+      offset += 500
+    }
+    console.log('[attio-compare] Fetched', attioEntries.length, 'Attio entries')
+
+    const attioByName = new Map<string, typeof attioEntries[number]>()
+    for (const e of attioEntries) {
+      if (e.name) attioByName.set(e.name.toLowerCase().trim(), e)
+    }
+
+    // Fetch all Supabase leads
+    const { data: leads, error: dbError } = await getAllLeadsFull()
+    if (dbError || !leads) return { ok: false, error: `DB error: ${dbError?.message}`, diffs: [], unchanged: 0, unmatched: 0 }
+    console.log('[attio-compare] Fetched', leads.length, 'Supabase leads')
+
+    const diffs: AttioDiffEntry[] = []
+    let unchanged = 0
+    let unmatched = 0
+
+    for (const lead of leads) {
+      const attioEntry = attioByName.get(lead.name.toLowerCase().trim())
+      if (!attioEntry) { unmatched++; continue }
+
+      const desired = leadToAttioValues(lead)
+      const diffFields: string[] = []
+      for (const [key, desiredVal] of Object.entries(desired)) {
+        if (String(desiredVal ?? '') !== String(attioEntry.values[key] ?? '')) {
+          diffFields.push(key)
+        }
+      }
+
+      if (diffFields.length === 0) { unchanged++; continue }
+
+      diffs.push({
+        leadId: lead.id,
+        leadName: lead.name,
+        recordId: attioEntry.recordId,
+        diffs: diffFields,
+        entryValues: desired,
+      })
+    }
+
+    console.log('[attio-compare] Result:', diffs.length, 'to update,', unchanged, 'unchanged,', unmatched, 'unmatched')
+    return { ok: true, diffs, unchanged, unmatched }
+  } catch (err) {
+    return { ok: false, error: String(err), diffs: [], unchanged: 0, unmatched: 0 }
+  }
+}
+
+/** Step 2: Update a single Attio entry (called from client in a loop) */
+export async function updateSingleAttioEntryAction(entry: {
+  leadId: string
+  recordId: string
+  entryValues: Record<string, unknown>
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.ATTIO_API_KEY
+  const listId = process.env.ATTIO_LIST_ID
+  if (!apiKey || !listId) return { ok: false, error: 'Missing env vars' }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+
+  // Log what we're sending for number fields
+  console.log('[attio-update-single]', entry.entryValues.company_name,
+    '| rating:', entry.entryValues.rating, typeof entry.entryValues.rating,
+    '| review_count:', entry.entryValues.review_count, typeof entry.entryValues.review_count)
+
+  try {
+    const body = {
+      data: { parent_record_id: entry.recordId, parent_object: 'companies', entry_values: entry.entryValues },
+    }
+    const resp = await fetch(`${ATTIO_BASE}/lists/${listId}/entries`, {
+      method: 'PUT', headers,
+      body: JSON.stringify(body),
+    })
+
+    const respData = await resp.json().catch(() => null)
+
+    if (!resp.ok) {
+      console.log('[attio-update-single] FAIL response:', JSON.stringify(respData))
+      await updateLeadAttioSync(entry.leadId, 'failed').catch(() => {})
+      return { ok: false, error: respData?.message ?? `HTTP ${resp.status}` }
+    }
+
+    // Log what Attio returned for the entry values to see if numbers stuck
+    const returnedVals = respData?.data?.entry_values ?? {}
+    console.log('[attio-update-single] Attio returned rating:', JSON.stringify(returnedVals.rating),
+      '| review_count:', JSON.stringify(returnedVals.review_count))
+
+    await updateLeadAttioSync(entry.leadId, 'synced').catch(() => {})
+    return { ok: true }
+  } catch (err) {
+    await updateLeadAttioSync(entry.leadId, 'failed').catch(() => {})
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 interface ParsedLead {

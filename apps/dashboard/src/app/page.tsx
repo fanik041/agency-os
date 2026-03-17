@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { getLeads, getClients, getMRR, getScrapeJobs } from '@agency-os/db'
+import { getLeads, getLeadCount, getClients, getMRR, getScrapeJobs } from '@agency-os/db'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Users, Briefcase, DollarSign, Search } from 'lucide-react'
@@ -10,15 +10,16 @@ import { LEAD_STATUS_LABELS } from '@/lib/constants'
 import { DeploySiteDialog } from '@/components/sites/deploy-site-dialog'
 
 export default async function DashboardPage() {
-  const [leadsRes, clientsRes, mrr, jobsRes] = await Promise.all([
+  const [leadsRes, leadCountRes, clientsRes, mrr, jobsRes] = await Promise.all([
     getLeads(),
+    getLeadCount(),
     getClients(),
     getMRR(),
     getScrapeJobs(),
   ])
 
   const leads = leadsRes.data ?? []
-  const totalLeads = leadsRes.count ?? leads.length
+  const totalLeads = leadCountRes.count
   const clients = clientsRes.data ?? []
   const jobs = (jobsRes.data ?? []).slice(0, 5)
 
