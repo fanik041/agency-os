@@ -1,0 +1,8 @@
+export { LeadRepository } from './lead-repository'
+export { ClientRepository } from './client-repository'
+export { ScrapeJobRepository } from './scrape-job-repository'
+export { CallLogRepository } from './call-log-repository'
+export { ContactRepository } from './contact-repository'
+export { ResearchJobRepository } from './research-job-repository'
+export { LeadSourceRepository } from './lead-source-repository'
+export { RevenueEventRepository } from './revenue-event-repository'
