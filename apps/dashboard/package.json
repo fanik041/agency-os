@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@agency-os/attio": "workspace:^",
     "@agency-os/db": "workspace:*",
     "@agency-os/site-generator": "workspace:*",
     "@agency-os/ui": "workspace:*",
