@@ -1,11 +1,16 @@
 'use server'
 
-import { createClient, updateClient, getLeadById, updateLeadStatus } from '@agency-os/db'
-import type { Client } from '@agency-os/db'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
+import { container } from '@/lib/container'
+import { createClientSchema, updateClientSchema } from '@agency-os/db'
+import { LeadStatus, SiteStatus } from '@agency-os/db'
+import type { Client } from '@agency-os/db'
 
 export async function createClientAction(formData: FormData) {
-  const data: Omit<Client, 'id' | 'created_at'> = {
+  await requireAuth()
+
+  const parsed = createClientSchema.parse({
     lead_id: (formData.get('lead_id') as string) || null,
     business_name: formData.get('business_name') as string,
     contact_name: (formData.get('contact_name') as string) || null,
@@ -13,23 +18,24 @@ export async function createClientAction(formData: FormData) {
     email: (formData.get('email') as string) || null,
     niche: (formData.get('niche') as string) || null,
     city: (formData.get('city') as string) || null,
+    deal_value: formData.get('deal_value') ? parseFloat(formData.get('deal_value') as string) : null,
+  })
+
+  await container.clientRepo.create({
+    ...parsed,
     site_url: null,
     github_repo: null,
     vercel_project_id: null,
-    deal_value: formData.get('deal_value') ? parseFloat(formData.get('deal_value') as string) : null,
     paid_upfront: 0,
     paid_final: 0,
     retainer_amount: 0,
     retainer_active: false,
     retainer_billing_day: null,
-    site_status: 'building',
-  }
+    site_status: SiteStatus.Building,
+  } as Omit<Client, 'id' | 'created_at'>)
 
-  const { error } = await createClient(data)
-  if (error) throw new Error(error.message)
-
-  if (data.lead_id) {
-    await updateLeadStatus(data.lead_id, 'closed')
+  if (parsed.lead_id) {
+    await container.leadRepo.updateStatus(parsed.lead_id, LeadStatus.Closed)
   }
 
   revalidatePath('/clients')
@@ -37,15 +43,16 @@ export async function createClientAction(formData: FormData) {
 }
 
 export async function convertLeadToClientAction(leadId: string) {
-  const { data: lead, error: leadError } = await getLeadById(leadId)
-  if (leadError || !lead) throw new Error('Lead not found')
+  await requireAuth()
 
-  const { error } = await createClient({
+  const lead = await container.leadRepo.getById(leadId)
+
+  await container.clientRepo.create({
     lead_id: leadId,
     business_name: lead.name,
     contact_name: null,
     phone: lead.phone,
-    email: lead.email,
+    email: lead.email_found,
     niche: lead.niche,
     city: lead.city,
     site_url: null,
@@ -57,18 +64,20 @@ export async function convertLeadToClientAction(leadId: string) {
     retainer_amount: 0,
     retainer_active: false,
     retainer_billing_day: null,
-    site_status: 'building',
-  })
-  if (error) throw new Error(error.message)
+    site_status: SiteStatus.Building,
+  } as Omit<Client, 'id' | 'created_at'>)
 
-  await updateLeadStatus(leadId, 'closed')
+  await container.leadRepo.updateStatus(leadId, LeadStatus.Closed)
 
   revalidatePath('/clients')
   revalidatePath('/leads')
 }
 
 export async function updateClientAction(id: string, formData: FormData) {
-  const updates: Partial<Omit<Client, 'id' | 'created_at'>> = {
+  await requireAuth()
+
+  const parsed = updateClientSchema.parse({
+    id,
     business_name: formData.get('business_name') as string,
     contact_name: (formData.get('contact_name') as string) || null,
     phone: (formData.get('phone') as string) || null,
@@ -84,11 +93,11 @@ export async function updateClientAction(id: string, formData: FormData) {
     retainer_billing_day: formData.get('retainer_billing_day')
       ? parseInt(formData.get('retainer_billing_day') as string, 10)
       : null,
-    site_status: (formData.get('site_status') as Client['site_status']) || 'building',
-  }
+    site_status: (formData.get('site_status') as string) || SiteStatus.Building,
+  })
 
-  const { error } = await updateClient(id, updates)
-  if (error) throw new Error(error.message)
+  const { id: _id, ...updates } = parsed
+  await container.clientRepo.update(id, updates as Partial<Omit<Client, 'id' | 'created_at'>>)
 
   revalidatePath(`/clients/${id}`)
   revalidatePath('/clients')
