@@ -40,7 +40,8 @@
       "Bash(cd /Users/fahimanik/code/agency-os/apps/dashboard && npx next lint 2>&1 | tail -30)",
       "Bash(npx next:*)",
       "Bash(kill 43118 43119 && sleep 1 && lsof -i :3000 -i :3001 2>/dev/null | grep LISTEN || echo \"Ports 3000 and 3001 are free\")",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(lsof -ti:3000,3001 | xargs kill -9 2>/dev/null; echo \"Done\")"
     ]
   }
 }

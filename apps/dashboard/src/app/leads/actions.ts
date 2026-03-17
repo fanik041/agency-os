@@ -50,6 +50,26 @@ export async function fetchAttioEntriesAction() {
   }
 }
 
+export async function findMissingInAttioAction() {
+  unstable_noStore()
+  await requireAuth()
+  try {
+    const [leads, attioResult] = await Promise.all([
+      container.leadRepo.getAll(),
+      container.attioSyncService.fetchEntries(),
+    ])
+    const attioNames = new Set(
+      attioResult.entries.map(e => e.company_name.toLowerCase().trim())
+    )
+    const missing = leads
+      .filter(l => !attioNames.has(l.name.toLowerCase().trim()))
+      .map(l => ({ id: l.id, name: l.name, address: l.address, website: l.website }))
+    return { ok: true as const, supabaseCount: leads.length, attioCount: attioResult.entries.length, missing }
+  } catch (err) {
+    return { ok: false as const, error: String(err), supabaseCount: 0, attioCount: 0, missing: [] as { id: string; name: string; address: string | null; website: string | null }[] }
+  }
+}
+
 export async function compareAttioAction() {
   unstable_noStore()
   await requireAuth()
@@ -67,6 +87,17 @@ export async function deduplicateAttioAction() {
     return { ok: true as const, ...await container.attioSyncService.deduplicate() }
   } catch (err) {
     return { ok: false as const, error: String(err), duplicatesFound: 0, removed: 0, failed: 0 }
+  }
+}
+
+export async function deduplicateLeadsAction() {
+  await requireAuth()
+  try {
+    const result = await container.leadRepo.deduplicate()
+    revalidatePath('/leads')
+    return { ok: true as const, ...result }
+  } catch (err) {
+    return { ok: false as const, error: String(err), duplicatesFound: 0, merged: 0, deleted: 0, errors: [] as string[] }
   }
 }
 

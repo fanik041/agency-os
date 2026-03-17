@@ -7,6 +7,7 @@ import { ImportLeadsDialog } from '@/components/leads/import-leads-dialog'
 import { AdvancedSearchDialog } from '@/components/leads/advanced-search-dialog'
 import { AttioViewerButton } from '@/components/leads/attio-viewer-button'
 import { SyncAttioButton } from '@/components/leads/update-attio-button'
+import { DeduplicateLeadsButton } from '@/components/leads/deduplicate-leads-button'
 
 export default async function LeadsPage({
   searchParams,
@@ -44,6 +45,7 @@ export default async function LeadsPage({
           <span className="text-sm text-muted-foreground">{totalCount} leads</span>
           <AdvancedSearchDialog sources={filterOptions.sources} scrapeJobs={scrapeJobs} />
           <AttioViewerButton />
+          <DeduplicateLeadsButton />
           <SyncAttioButton />
           <ImportLeadsDialog />
         </div>

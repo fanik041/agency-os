@@ -77,8 +77,34 @@ export class AttioSyncService {
       this.attioClient.fetchAllEntries(),
     ])
 
-    const attioByName = new Map(
-      attioEntries.map(e => [e.name.toLowerCase().trim(), e])
+    // Build lookup maps: prefer name+address composite key for unique matching,
+    // fall back to name-only for leads without duplicates
+    const attioByNameAddress = new Map<string, typeof attioEntries[number]>()
+    const attioByName = new Map<string, typeof attioEntries[number]>()
+    for (const e of attioEntries) {
+      const nameKey = e.name.toLowerCase().trim()
+      const addr = String(e.values.place_id ?? e.values.address ?? '').toLowerCase().trim()
+      if (addr) {
+        attioByNameAddress.set(`${nameKey}::${addr}`, e)
+      }
+      // Only use name fallback if there's no duplicate name (chains like "Anytime Fitness")
+      if (!attioByName.has(nameKey)) {
+        attioByName.set(nameKey, e)
+      } else {
+        // Multiple entries with same name — remove from name map to force composite matching
+        attioByName.delete(nameKey)
+      }
+    }
+
+    // Detect domains shared by multiple leads — these can't use domain matching
+    // in assertCompany because Attio would merge them into one company record
+    const domainCount = new Map<string, number>()
+    for (const lead of leads) {
+      const domain = this.extractDomain(lead.website)
+      if (domain) domainCount.set(domain, (domainCount.get(domain) ?? 0) + 1)
+    }
+    const sharedDomains = new Set(
+      [...domainCount.entries()].filter(([, count]) => count > 1).map(([d]) => d)
     )
 
     const diffs: AttioDiffEntry[] = []
@@ -86,15 +112,22 @@ export class AttioSyncService {
     let unchanged = 0
 
     for (const lead of leads) {
-      const attioEntry = attioByName.get(lead.name.toLowerCase().trim())
+      // Match by name+address first (handles franchises), then fall back to name-only
+      const nameKey = lead.name.toLowerCase().trim()
+      const addr = (lead.address ?? '').toLowerCase().trim()
+      const attioEntry = (addr ? attioByNameAddress.get(`${nameKey}::${addr}`) : undefined)
+        ?? attioByName.get(nameKey)
       const desired = this.leadToAttioValues(lead)
 
       if (!attioEntry) {
         // Lead exists in Supabase but not in Attio — needs to be created
+        // Don't pass domain if it's shared by multiple leads (would merge into one company)
+        const domain = this.extractDomain(lead.website)
+        const safeDomain = domain && !sharedDomains.has(domain) ? domain : undefined
         newEntries.push({
           leadId: lead.id,
           leadName: lead.name,
-          domain: this.extractDomain(lead.website),
+          domain: safeDomain,
           entryValues: desired,
         })
         continue
@@ -137,13 +170,17 @@ export class AttioSyncService {
       if (field !== 'company_name') patchValues[field] = entry.entryValues[field]
     }
 
+    console.log(`[SYNC:UPDATE] "${entry.leadName}" — fields: ${entry.changedFields.join(', ')} | recordId: ${entry.recordId}`)
     try {
       await this.attioClient.upsertEntry(entry.recordId, patchValues)
       await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Synced)
+      console.log(`[SYNC:UPDATE] "${entry.leadName}" — SUCCESS`)
       return { ok: true }
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error(`[SYNC:UPDATE] "${entry.leadName}" — FAILED: ${errMsg}`)
       await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Failed).catch(() => {})
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return { ok: false, error: errMsg }
     }
   }
 
@@ -153,19 +190,25 @@ export class AttioSyncService {
     domain?: string
     entryValues: Record<string, unknown>
   }): Promise<{ ok: boolean; error?: string }> {
+    console.log(`[SYNC:CREATE] "${entry.leadName}" — domain: ${entry.domain ?? '(none, will POST new)'} | fields: ${Object.keys(entry.entryValues).filter(k => k !== 'company_name').join(', ')}`)
     try {
       // Step 1: Assert/create the company record in Attio, get its record ID
       const recordId = await this.attioClient.assertCompany(entry.leadName, entry.domain)
+      console.log(`[SYNC:CREATE] "${entry.leadName}" — assertCompany returned recordId: ${recordId}`)
 
       // Step 2: Add/update the list entry with all field values
       await this.attioClient.upsertEntry(recordId, entry.entryValues)
+      console.log(`[SYNC:CREATE] "${entry.leadName}" — upsertEntry SUCCESS`)
 
       // Step 3: Mark as synced in Supabase
       await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Synced)
+      console.log(`[SYNC:CREATE] "${entry.leadName}" — marked as synced in Supabase`)
       return { ok: true }
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error(`[SYNC:CREATE] "${entry.leadName}" — FAILED: ${errMsg}`)
       await this.leadRepo.updateAttioSync(entry.leadId, AttioSyncStatus.Failed).catch(() => {})
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return { ok: false, error: errMsg }
     }
   }
 
@@ -195,7 +238,6 @@ export class AttioSyncService {
     if (lead.niche) v.niche = lead.niche
     if (lead.city) v.city = lead.city
     if (lead.address) v.address = lead.address
-    if (lead.maps_url) v.maps_url = lead.maps_url
     return v
   }
 

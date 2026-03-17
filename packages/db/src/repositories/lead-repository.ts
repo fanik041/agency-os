@@ -133,6 +133,78 @@ export class LeadRepository {
     return results
   }
 
+  async deduplicate(): Promise<{ duplicatesFound: number; merged: number; deleted: number; errors: string[] }> {
+    const { data: allLeads, error } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(`Failed to fetch leads: ${error.message}`)
+
+    const leads = allLeads as Lead[]
+    const byName = new Map<string, Lead[]>()
+    for (const lead of leads) {
+      const key = lead.name.toLowerCase().trim()
+      if (!key) continue
+      const group = byName.get(key) ?? []
+      group.push(lead)
+      byName.set(key, group)
+    }
+
+    let duplicatesFound = 0
+    let merged = 0
+    let deleted = 0
+    const errors: string[] = []
+
+    for (const [, group] of byName) {
+      if (group.length <= 1) continue
+      duplicatesFound += group.length - 1
+
+      // Keep the first (oldest) entry, merge data from duplicates into it
+      const keeper = group[0]
+      const mergeFields: Partial<Lead> = {}
+
+      for (let i = 1; i < group.length; i++) {
+        const dup = group[i]
+        // Only fill in null/empty fields on the keeper — never overwrite existing data
+        for (const [key, val] of Object.entries(dup)) {
+          if (key === 'id' || key === 'created_at') continue
+          const keeperVal = keeper[key as keyof Lead]
+          if ((keeperVal === null || keeperVal === '' || keeperVal === undefined) && val != null && val !== '') {
+            (mergeFields as Record<string, unknown>)[key] = val
+          }
+        }
+      }
+
+      // Update keeper with merged fields if any
+      if (Object.keys(mergeFields).length > 0) {
+        const { error: updateErr } = await supabaseAdmin
+          .from('leads')
+          .update(mergeFields)
+          .eq('id', keeper.id)
+        if (updateErr) {
+          errors.push(`Failed to merge into "${keeper.name}": ${updateErr.message}`)
+          continue
+        }
+        merged++
+      }
+
+      // Delete duplicates (all except keeper)
+      for (let i = 1; i < group.length; i++) {
+        const { error: delErr } = await supabaseAdmin
+          .from('leads')
+          .delete()
+          .eq('id', group[i].id)
+        if (delErr) {
+          errors.push(`Failed to delete dup "${group[i].name}" (${group[i].id}): ${delErr.message}`)
+        } else {
+          deleted++
+        }
+      }
+    }
+
+    return { duplicatesFound, merged, deleted, errors }
+  }
+
   async getFilterOptions(): Promise<{ niches: string[]; cities: string[]; sources: LeadSource[] }> {
     const [nichesRes, citiesRes, sourcesRes] = await Promise.all([
       supabaseAdmin.from('leads').select('niche').not('niche', 'is', null),

@@ -57,6 +57,7 @@ export class AttioClient {
   }
 
   async upsertEntry(recordId: string, entryValues: Record<string, unknown>): Promise<void> {
+    console.log(`[ATTIO:upsertEntry] PUT /lists/${this.listId}/entries — recordId: ${recordId}, fields: ${Object.keys(entryValues).join(', ')}`)
     const resp = await fetch(`${this.baseUrl}/lists/${this.listId}/entries`, {
       method: 'PUT',
       headers: this.headers,
@@ -71,14 +72,19 @@ export class AttioClient {
 
     if (!resp.ok) {
       const errData = (await resp.json().catch(() => null)) as { message?: string } | null
-      throw new Error(errData?.message ?? `HTTP ${resp.status}`)
+      const errMsg = errData?.message ?? `HTTP ${resp.status}`
+      console.error(`[ATTIO:upsertEntry] FAILED: ${errMsg}`)
+      throw new Error(errMsg)
     }
+    const respData = await resp.json() as { data?: { id?: { entry_id?: string } } }
+    console.log(`[ATTIO:upsertEntry] OK — entryId: ${respData.data?.id?.entry_id ?? '(unknown)'}`)
   }
 
   async assertCompany(name: string, domain?: string): Promise<string> {
     // If we have a domain, use PUT assert with domains as matching_attribute (query param)
     // If no domain, use POST to create a new company record
     if (domain) {
+      console.log(`[ATTIO:assertCompany] PUT with matching_attribute=domains — name: "${name}", domain: "${domain}"`)
       const url = new URL(`${this.baseUrl}/objects/companies/records`)
       url.searchParams.set('matching_attribute', 'domains')
       const resp = await fetch(url.toString(), {
@@ -95,15 +101,19 @@ export class AttioClient {
       })
       if (!resp.ok) {
         const errData = (await resp.json().catch(() => null)) as { message?: string } | null
-        throw new Error(`Failed to assert company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
+        const errMsg = `Failed to assert company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`
+        console.error(`[ATTIO:assertCompany] ${errMsg}`)
+        throw new Error(errMsg)
       }
       const data = (await resp.json()) as { data?: { id?: { record_id?: string } } }
       const recordId = data.data?.id?.record_id
       if (!recordId) throw new Error(`No record_id returned for company "${name}"`)
+      console.log(`[ATTIO:assertCompany] OK — recordId: ${recordId}`)
       return recordId
     }
 
     // No domain — create new company record directly
+    console.log(`[ATTIO:assertCompany] POST new company — name: "${name}" (no domain)`)
     const resp = await fetch(`${this.baseUrl}/objects/companies/records`, {
       method: 'POST',
       headers: this.headers,
@@ -117,11 +127,14 @@ export class AttioClient {
     })
     if (!resp.ok) {
       const errData = (await resp.json().catch(() => null)) as { message?: string } | null
-      throw new Error(`Failed to create company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`)
+      const errMsg = `Failed to create company "${name}": ${errData?.message ?? `HTTP ${resp.status}`}`
+      console.error(`[ATTIO:assertCompany] ${errMsg}`)
+      throw new Error(errMsg)
     }
     const data = (await resp.json()) as { data?: { id?: { record_id?: string } } }
     const recordId = data.data?.id?.record_id
     if (!recordId) throw new Error(`No record_id returned for company "${name}"`)
+    console.log(`[ATTIO:assertCompany] OK — recordId: ${recordId}`)
     return recordId
   }
 
