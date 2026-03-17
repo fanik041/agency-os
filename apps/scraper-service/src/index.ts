@@ -7,6 +7,8 @@ import {
   createScrapeJob, updateScrapeJob, getScrapeJobs, upsertLead,
   getLeadById, createResearchJob, updateResearchJob, upsertContact,
   createLeadSource, updateLeadSourceCount,
+  ScrapeJobStatus, LeadStatus, AttioSyncStatus, LeadSourceType,
+  ResearchJobStatus, ContactSource,
 } from '@agency-os/db'
 import { scrapeGoogleMaps, closeBrowser } from './scraper'
 import { enrichBusiness } from './enricher'
@@ -326,14 +328,14 @@ async function runScrapeJob(
 
   try {
     await updateScrapeJob(jobId, {
-      status: 'running',
+      status: ScrapeJobStatus.Running,
       started_at: new Date().toISOString(),
     })
 
     // Create a lead_source to track this scrape batch
     const sourceLabel = `${niches.join(', ')} — ${city}`
     const { data: leadSource } = await createLeadSource({
-      type: 'scrape',
+      type: LeadSourceType.Scrape,
       label: sourceLabel,
       scrape_job_id: jobId,
     })
@@ -387,9 +389,9 @@ async function runScrapeJob(
             has_social_proof: null,
             tech_stack: null,
             analyze: null,
-            status: 'new' as const,
+            status: LeadStatus.New,
             notes: null,
-            attio_sync_status: 'not_synced' as const,
+            attio_sync_status: AttioSyncStatus.NotSynced,
             attio_synced_at: null,
             source_id: sourceId,
           })
@@ -418,7 +420,7 @@ async function runScrapeJob(
     }
 
     await updateScrapeJob(jobId, {
-      status: 'done',
+      status: ScrapeJobStatus.Done,
       leads_found: totalLeads,
       finished_at: new Date().toISOString(),
     })
@@ -429,7 +431,7 @@ async function runScrapeJob(
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[Job ${jobId}] Failed:`, message)
     await updateScrapeJob(jobId, {
-      status: 'failed',
+      status: ScrapeJobStatus.Failed,
       error_message: message,
       finished_at: new Date().toISOString(),
     })
@@ -466,7 +468,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
 
   try {
     await updateResearchJob(jobId, {
-      status: 'running',
+      status: ResearchJobStatus.Running,
       started_at: new Date().toISOString(),
     })
 
@@ -495,7 +497,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
             email: contact.email,
             phone: null,
             linkedin_url: contact.linkedin_url,
-            source: contact.source,
+            source: contact.source as ContactSource,
             confidence: contact.confidence,
             notes: null,
             tags: [],
@@ -514,7 +516,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
     }
 
     await updateResearchJob(jobId, {
-      status: 'done',
+      status: ResearchJobStatus.Done,
       processed,
       contacts_found: contactsFound,
       finished_at: new Date().toISOString(),
@@ -524,7 +526,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[Research ${jobId}] Failed:`, message)
     await updateResearchJob(jobId, {
-      status: 'failed',
+      status: ResearchJobStatus.Failed,
       error_message: message,
       finished_at: new Date().toISOString(),
     })
