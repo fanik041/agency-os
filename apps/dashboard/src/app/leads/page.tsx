@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { getLeads, getLeadFilterOptions, getScrapeJobs } from '@agency-os/db'
-import type { CallStatus } from '@agency-os/db'
+import type { LeadStatus } from '@agency-os/db'
 import { LeadsClient } from '@/components/leads/leads-client'
 import { ImportLeadsDialog } from '@/components/leads/import-leads-dialog'
 import { AdvancedSearchDialog } from '@/components/leads/advanced-search-dialog'
@@ -19,7 +19,7 @@ export default async function LeadsPage({
     getLeads({
       niche: params.niche,
       city: params.city,
-      callStatus: params.call_status as CallStatus | undefined,
+      status: params.status as LeadStatus | undefined,
       minQuality: params.min_quality ? parseInt(params.min_quality, 10) : undefined,
       q: params.q,
       sourceId: params.source_id,

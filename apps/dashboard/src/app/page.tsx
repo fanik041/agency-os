@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Users, Briefcase, DollarSign, Search } from 'lucide-react'
 import { JOB_STATUS_COLORS, STATUS_COLORS } from '@/lib/constants'
-import type { CallStatus, ScrapeJobStatus } from '@agency-os/db'
+import type { LeadStatus, ScrapeJobStatus } from '@agency-os/db'
+import { LEAD_STATUS_LABELS } from '@/lib/constants'
 import { DeploySiteDialog } from '@/components/sites/deploy-site-dialog'
 
 export default async function DashboardPage() {
@@ -17,11 +18,12 @@ export default async function DashboardPage() {
   ])
 
   const leads = leadsRes.data ?? []
+  const totalLeads = leadsRes.count ?? leads.length
   const clients = clientsRes.data ?? []
   const jobs = (jobsRes.data ?? []).slice(0, 5)
 
   const metrics = [
-    { label: 'Total Leads', value: leads.length, icon: Users },
+    { label: 'Total Leads', value: totalLeads, icon: Users },
     { label: 'Clients', value: clients.length, icon: Briefcase },
     { label: 'MRR', value: `$${mrr.toLocaleString()}`, icon: DollarSign },
     { label: 'Scrape Jobs', value: (jobsRes.data ?? []).length, icon: Search },
@@ -68,8 +70,8 @@ export default async function DashboardPage() {
                       <span className="font-medium">{lead.name}</span>
                       <span className="ml-2 text-muted-foreground">{lead.city}</span>
                     </div>
-                    <Badge variant="secondary" className={STATUS_COLORS[lead.call_status as CallStatus]}>
-                      {lead.call_status}
+                    <Badge variant="secondary" className={STATUS_COLORS[lead.status as LeadStatus]}>
+                      {LEAD_STATUS_LABELS[lead.status as LeadStatus] ?? lead.status}
                     </Badge>
                   </div>
                 ))}

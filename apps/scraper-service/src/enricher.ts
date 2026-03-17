@@ -165,10 +165,11 @@ export interface EnrichedLead {
   name: string
   phone: string | null
   address: string | null
-  email: string | null
+  email_found: string | null
   website: string | null
   rating: number | null
   review_count: number
+  reviews_raw: string | null
   maps_url: string | null
   has_website: boolean
   site_quality: number
@@ -188,7 +189,7 @@ export async function enrichBusiness(
 
   return {
     ...business,
-    email,
+    email_found: email,
     has_website,
     site_quality,
   }

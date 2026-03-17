@@ -28,7 +28,7 @@ interface ParsedLead {
   phone: string | null
   email: string | null
   website: string | null
-  site_quality: number | null
+  pain_score: number | null
   city: string | null
 }
 
@@ -45,8 +45,9 @@ const COLUMN_MAP: Record<string, keyof ParsedLead> = {
   'website': 'website',
   'site url': 'website',
   'url': 'website',
-  'site quality': 'site_quality',
-  'quality': 'site_quality',
+  'site quality': 'pain_score',
+  'quality': 'pain_score',
+  'pain score': 'pain_score',
   'city': 'city',
   'location': 'city',
 }
@@ -87,7 +88,7 @@ export function ImportLeadsDialog() {
               phone: null,
               email: null,
               website: null,
-              site_quality: null,
+              pain_score: null,
               city: null,
             }
 
@@ -95,8 +96,8 @@ export function ImportLeadsDialog() {
               const key = COLUMN_MAP[col.toLowerCase().trim()]
               if (key && val != null && val !== '') {
                 const strVal = String(val).trim()
-                if (key === 'site_quality') {
-                  lead.site_quality = parseInt(strVal, 10) || null
+                if (key === 'pain_score') {
+                  lead.pain_score = parseInt(strVal, 10) || null
                 } else if (key === 'name') {
                   lead.name = strVal
                 } else if (key === 'niche') {
@@ -196,7 +197,7 @@ export function ImportLeadsDialog() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Website</TableHead>
-                      <TableHead>Quality</TableHead>
+                      <TableHead>Pain Score</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -209,7 +210,7 @@ export function ImportLeadsDialog() {
                         <TableCell className="max-w-[200px] truncate">
                           {lead.website ?? '—'}
                         </TableCell>
-                        <TableCell>{lead.site_quality ?? '—'}</TableCell>
+                        <TableCell>{lead.pain_score ?? '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

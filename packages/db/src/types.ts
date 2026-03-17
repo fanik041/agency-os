@@ -1,4 +1,7 @@
-export type CallStatus = 'pending' | 'called' | 'callback' | 'interested' | 'closed' | 'dead'
+export type LeadStatus = 'new' | 'scoring' | 'needs_review' | 'approved' | 'sent' | 'replied' | 'booked' | 'closed' | 'skip'
+export type AttioSyncStatus = 'not_synced' | 'synced' | 'failed'
+/** @deprecated Use LeadStatus instead */
+export type CallStatus = LeadStatus
 export type SiteStatus = 'building' | 'live' | 'paused'
 export type ScrapeJobStatus = 'queued' | 'running' | 'done' | 'failed'
 export type CallOutcome =
@@ -15,22 +18,44 @@ export type LeadSourceType = 'scrape' | 'import' | 'manual'
 
 export interface Lead {
   id: string
-  niche: string | null
   name: string
-  phone: string | null
-  address: string | null
-  email: string | null
   website: string | null
+  phone: string | null
+  place_id: string | null
+  has_booking: boolean
+  has_chat_widget: boolean
+  has_contact_form: boolean
+  reviews_raw: string | null
+  pain_score: number | null
+  pain_points: string | null
+  suggested_angle: string | null
+  message_draft: string | null
+  email_found: string | null
+  status: LeadStatus
+  follow_up_date: string | null
+  notes: string | null
+  // Legacy fields kept for backward compat
+  niche: string | null
+  address: string | null
   rating: number | null
   review_count: number
   maps_url: string | null
   city: string | null
   has_website: boolean
-  site_quality: number | null // 1-5, 5 = no website (hottest)
-  call_status: CallStatus
-  call_notes: string | null
-  called_at: string | null
+  site_quality: number | null
+  page_load_ms: number | null
+  mobile_friendly: boolean | null
+  has_ssl: boolean | null
+  seo_issues: string | null
+  has_cta: boolean | null
+  phone_on_site: boolean | null
+  hours_on_site: boolean | null
+  has_social_proof: boolean | null
+  tech_stack: string | null
+  analyze: string | null
   source_id: string | null
+  attio_sync_status: AttioSyncStatus
+  attio_synced_at: string | null
   created_at: string
 }
 

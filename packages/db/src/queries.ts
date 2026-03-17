@@ -1,12 +1,12 @@
 import { supabaseAdmin } from './client'
-import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
+import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, LeadStatus, AttioSyncStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
 
 // LEADS
 export async function getLeads(filters?: {
   city?: string
   niche?: string
-  callStatus?: CallStatus
-  minQuality?: number
+  status?: LeadStatus
+  minPainScore?: number
   q?: string
   sourceId?: string
   page?: number
@@ -20,12 +20,12 @@ export async function getLeads(filters?: {
   let query = supabaseAdmin
     .from('leads')
     .select('*', { count: 'exact' })
-    .order('site_quality', { ascending: false })
+    .order('pain_score', { ascending: false, nullsFirst: false })
 
   if (filters?.city) query = query.eq('city', filters.city)
   if (filters?.niche) query = query.eq('niche', filters.niche)
-  if (filters?.callStatus) query = query.eq('call_status', filters.callStatus)
-  if (filters?.minQuality) query = query.gte('site_quality', filters.minQuality)
+  if (filters?.status) query = query.eq('status', filters.status)
+  if (filters?.minPainScore) query = query.gte('pain_score', filters.minPainScore)
   if (filters?.q) query = query.ilike('name', `%${filters.q}%`)
   if (filters?.sourceId) query = query.eq('source_id', filters.sourceId)
 
@@ -95,10 +95,22 @@ export async function upsertLead(lead: Omit<Lead, 'id' | 'created_at'> & { id?: 
   return supabaseAdmin.from('leads').insert(lead).select().single()
 }
 
-export async function updateLeadStatus(id: string, status: CallStatus, notes?: string) {
+export async function updateLeadStatus(id: string, status: LeadStatus, notes?: string) {
   return supabaseAdmin
     .from('leads')
-    .update({ call_status: status, call_notes: notes, called_at: new Date().toISOString() })
+    .update({ status, notes })
+    .eq('id', id)
+    .select()
+    .single()
+}
+
+export async function updateLeadAttioSync(id: string, syncStatus: AttioSyncStatus) {
+  return supabaseAdmin
+    .from('leads')
+    .update({
+      attio_sync_status: syncStatus,
+      attio_synced_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single()
@@ -210,9 +222,8 @@ export async function bulkUpsertLeads(leads: Omit<Lead, 'id' | 'created_at'>[]) 
     try {
       const { error } = await upsertLead({
         ...lead,
-        call_status: lead.call_status || 'pending',
-        call_notes: lead.call_notes || null,
-        called_at: lead.called_at || null,
+        status: lead.status || 'new',
+        notes: lead.notes || null,
       })
       if (error) {
         results.errors.push(`${lead.name}: ${error.message}`)

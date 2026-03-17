@@ -1,0 +1,223 @@
+{
+  "name": "Lead Scorer Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "score-lead",
+        "responseMode": "lastNode"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "lead_id", "value": "={{ $json.lead_id }}" },
+            { "name": "website", "value": "={{ $json.website }}" },
+            { "name": "name", "value": "={{ $json.name }}" }
+          ]
+        }
+      },
+      "name": "Prepare",
+      "type": "n8n-nodes-base.set",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/leads?id=eq.{{ $json.lead_id }}&select=pain_score",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "name": "Dedup Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.website }}", "operation": "isNotEmpty" }
+          ]
+        }
+      },
+      "name": "Has Website?",
+      "type": "n8n-nodes-base.if",
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SCRAPER_SERVICE_URL }}/analyze",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.SCRAPER_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "url", "value": "={{ $json.website }}" }
+          ]
+        },
+        "options": {
+          "retry": { "maxTries": 3, "waitBetweenTries": 5000 }
+        }
+      },
+      "name": "Analyze Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.result.reachable }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Check Reachable",
+      "type": "n8n-nodes-base.if",
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "prompt",
+              "value": "You are a lead scoring assistant. Analyze this business and return a JSON object.\n\nBusiness: {{ $json.name }}\nWebsite: {{ $json.website }}\nSignals: {{ JSON.stringify($json.result) }}\n\nReturn JSON with:\n- pain_score (1-9, where 9 = most pain, needs help the most)\n- pain_points (string, comma-separated list)\n- suggested_angle (string, best approach for outreach)\n- message_draft (string, short cold outreach message)"
+            }
+          ]
+        }
+      },
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.set",
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "model": "gpt-5",
+        "messages": {
+          "values": [
+            { "content": "={{ $json.prompt }}" }
+          ]
+        },
+        "options": {
+          "temperature": 0.4,
+          "response_format": { "type": "json_object" }
+        }
+      },
+      "name": "OpenAI Score",
+      "type": "n8n-nodes-base.openAi",
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.pain_score }}", "operation": "largerEqual", "value2": 6 }
+          ]
+        }
+      },
+      "name": "Score >= 6?",
+      "type": "n8n-nodes-base.if",
+      "position": [1850, 100]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/leads?id=eq.{{ $json.lead_id }}",
+        "method": "PATCH",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pain_score: $json.pain_score, pain_points: $json.pain_points, suggested_angle: $json.suggested_angle, message_draft: $json.message_draft, status: $json.pain_score >= 6 ? 'needs_review' : ($json.pain_score >= 4 ? 'scoring' : 'skip'), analyze: JSON.stringify($json.analyze_result) }) }}"
+      },
+      "name": "Update Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2050, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.attio.com/v2/objects/companies/records?matching_attribute=domains",
+        "method": "PUT",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.ATTIO_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { values: { name: [{ value: $json.name }], domains: [{ domain: $json.website.replace(/https?:\\/\\//, '').replace(/\\/.*$/, '') }] } } }) }}"
+      },
+      "name": "Update Attio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/leads?id=eq.{{ $json.lead_id }}",
+        "method": "PATCH",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"skip\" }"
+      },
+      "name": "Write Skip Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Prepare" }]] },
+    "Prepare": { "main": [[{ "node": "Dedup Check" }]] },
+    "Dedup Check": { "main": [[{ "node": "Has Website?" }]] },
+    "Has Website?": {
+      "main": [
+        [{ "node": "Analyze Website" }],
+        [{ "node": "Write Skip Status" }]
+      ]
+    },
+    "Analyze Website": { "main": [[{ "node": "Check Reachable" }]] },
+    "Check Reachable": {
+      "main": [
+        [{ "node": "Build Prompt" }],
+        [{ "node": "Write Skip Status" }]
+      ]
+    },
+    "Build Prompt": { "main": [[{ "node": "OpenAI Score" }]] },
+    "OpenAI Score": { "main": [[{ "node": "Score >= 6?" }]] },
+    "Score >= 6?": {
+      "main": [
+        [{ "node": "Update Supabase" }, { "node": "Update Attio" }],
+        [{ "node": "Update Supabase" }, { "node": "Update Attio" }]
+      ]
+    }
+  }
+}

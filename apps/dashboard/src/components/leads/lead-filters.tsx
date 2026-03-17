@@ -13,12 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const CALL_STATUSES = ['pending', 'called', 'callback', 'interested', 'closed', 'dead'] as const
-const QUALITY_LEVELS = [
-  { value: '3', label: '3+ (Decent)' },
-  { value: '4', label: '4+ (Poor site)' },
-  { value: '5', label: '5 (No site)' },
-]
+const LEAD_STATUSES = ['new', 'scoring', 'needs_review', 'approved', 'sent', 'replied', 'booked', 'closed', 'skip'] as const
 
 export function LeadFilters({
   niches,
@@ -95,26 +90,14 @@ export function LeadFilters({
         </SelectContent>
       </Select>
 
-      <Select value={searchParams.get('call_status') ?? 'all'} onValueChange={(v) => setParam('call_status', v)}>
+      <Select value={searchParams.get('status') ?? 'all'} onValueChange={(v) => setParam('status', v)}>
         <SelectTrigger className="w-36">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Statuses</SelectItem>
-          {CALL_STATUSES.map((s) => (
+          {LEAD_STATUSES.map((s) => (
             <SelectItem key={s} value={s}>{s}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={searchParams.get('min_quality') ?? 'all'} onValueChange={(v) => setParam('min_quality', v)}>
-        <SelectTrigger className="w-36">
-          <SelectValue placeholder="Quality" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Any Quality</SelectItem>
-          {QUALITY_LEVELS.map((q) => (
-            <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
           ))}
         </SelectContent>
       </Select>

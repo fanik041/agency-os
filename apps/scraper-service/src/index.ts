@@ -11,6 +11,7 @@ import {
 import { scrapeGoogleMaps, closeBrowser } from './scraper'
 import { enrichBusiness } from './enricher'
 import { searchDecisionMakers } from './researcher'
+import { analyzeWebsite, isValidUrl } from './analyzer'
 
 const app = express()
 app.use(express.json())
@@ -38,6 +39,7 @@ app.get('/', (_req, res) => res.json({
     'POST /scrape': 'Start a new scrape job — body: { niches: string[], location: string, maxPerNiche?: number, withEmails?: boolean }',
     'POST /scrape/stream': 'SSE stream — same body as POST /scrape, returns real-time events',
     'POST /research': 'Start decision-maker research — body: { leadIds: string[] }',
+    'POST /analyze': 'Analyze a website for 13 signals — body: { url: string }',
   },
 }))
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
@@ -356,13 +358,38 @@ async function runScrapeJob(
           emit('lead', `Found: ${enriched.name}`, leadData)
 
           // Persist to DB (non-blocking for the lead stream)
+          // Extract place_id from maps_url if present (only real Place IDs starting with ChIJ)
+          const placeIdMatch = enriched.maps_url?.match(/place_id[=:]([^&/]+)/) ??
+            enriched.maps_url?.match(/(ChIJ[A-Za-z0-9_-]+)/)
+          const placeId = placeIdMatch?.[1] ?? null
+
           const { error } = await upsertLead({
             ...enriched,
             niche,
             city,
-            call_status: 'pending',
-            call_notes: null,
-            called_at: null,
+            place_id: placeId,
+            has_booking: false,
+            has_chat_widget: false,
+            has_contact_form: false,
+            pain_score: null,
+            pain_points: null,
+            suggested_angle: null,
+            message_draft: null,
+            follow_up_date: null,
+            page_load_ms: null,
+            mobile_friendly: null,
+            has_ssl: null,
+            seo_issues: null,
+            has_cta: null,
+            phone_on_site: null,
+            hours_on_site: null,
+            has_social_proof: null,
+            tech_stack: null,
+            analyze: null,
+            status: 'new' as const,
+            notes: null,
+            attio_sync_status: 'not_synced' as const,
+            attio_synced_at: null,
             source_id: sourceId,
           })
           if (!error) {
@@ -502,6 +529,29 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
     })
   }
 }
+
+// ── POST /analyze ──────────────────────────────────────────────
+app.post('/analyze', authMiddleware, async (req, res) => {
+  const { url } = req.body
+
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'url (string) is required' })
+  }
+
+  if (!isValidUrl(url)) {
+    return res.status(400).json({ error: 'Invalid URL' })
+  }
+
+  try {
+    const result = await analyzeWebsite(url)
+    res.json({ ok: true, result })
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+})
 
 // ── Start server ────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001

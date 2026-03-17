@@ -18,9 +18,9 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { logCallAction } from '@/app/leads/actions'
 import { convertLeadToClientAction } from '@/app/clients/actions'
-import { OUTCOME_LABELS, STATUS_COLORS } from '@/lib/constants'
+import { OUTCOME_LABELS, STATUS_COLORS, LEAD_STATUS_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
-import { Briefcase } from 'lucide-react'
+import { Briefcase, CheckCircle, MessageCircle, FileText } from 'lucide-react'
 
 const OUTCOMES: CallOutcome[] = [
   'no_answer',
@@ -78,45 +78,114 @@ export function CallLoggerSheet({
         <div className="mt-4 space-y-4">
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Website</span>
+              <span className="font-medium">
+                {lead.website ? (
+                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {lead.website.replace(/https?:\/\//, '')}
+                  </a>
+                ) : 'N/A'}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Phone</span>
               <span className="font-medium">{lead.phone ?? 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Email</span>
-              <span className="font-medium">{lead.email ?? 'N/A'}</span>
+              <span className="text-muted-foreground">Address</span>
+              <span className="font-medium text-xs max-w-[200px] text-right">{lead.address ?? 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Niche</span>
-              <span className="font-medium">{lead.niche ?? 'N/A'}</span>
+              <span className="text-muted-foreground">Rating</span>
+              <span className="font-medium">{lead.rating != null ? `${lead.rating}/5` : 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">City</span>
-              <span className="font-medium">{lead.city ?? 'N/A'}</span>
+              <span className="text-muted-foreground">Review Count</span>
+              <span className="font-medium">{lead.review_count ?? 0}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Site Quality</span>
-              <span className="font-medium">{lead.site_quality ?? 'N/A'}/5</span>
+              <span className="text-muted-foreground">Widgets</span>
+              <span className="flex items-center gap-1.5">
+                {lead.has_booking && <span title="Booking"><CheckCircle className="h-3.5 w-3.5 text-green-500" /></span>}
+                {lead.has_chat_widget && <span title="Chat"><MessageCircle className="h-3.5 w-3.5 text-blue-500" /></span>}
+                {lead.has_contact_form && <span title="Form"><FileText className="h-3.5 w-3.5 text-purple-500" /></span>}
+                {!lead.has_booking && !lead.has_chat_widget && !lead.has_contact_form && 'None'}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Current Status</span>
-              <Badge variant="secondary" className={STATUS_COLORS[lead.call_status]}>
-                {lead.call_status}
+              <span className="text-muted-foreground">Pain Score</span>
+              <span className={`font-medium ${lead.pain_score != null && lead.pain_score >= 6 ? 'text-red-600' : ''}`}>
+                {lead.pain_score != null ? `${lead.pain_score}/9` : 'N/A'}
+              </span>
+            </div>
+            {lead.pain_points && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pain Points</span>
+                <span className="max-w-[200px] text-right text-xs">{lead.pain_points}</span>
+              </div>
+            )}
+            {lead.suggested_angle && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Suggested Angle</span>
+                <span className="max-w-[200px] text-right text-xs">{lead.suggested_angle}</span>
+              </div>
+            )}
+            {lead.message_draft && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Message Draft</span>
+                <span className="max-w-[200px] text-right text-xs">{lead.message_draft}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Email Found</span>
+              <span className="font-medium">{lead.email_found ?? 'N/A'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <Badge variant="secondary" className={STATUS_COLORS[lead.status]}>
+                {LEAD_STATUS_LABELS[lead.status]}
               </Badge>
+            </div>
+            {lead.follow_up_date && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Follow Up</span>
+                <span className="font-medium">{lead.follow_up_date}</span>
+              </div>
+            )}
+            {lead.notes && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Notes</span>
+                <span className="max-w-[200px] text-right text-xs">{lead.notes}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Attio Sync</span>
+              <span className={`font-medium text-xs ${
+                lead.attio_sync_status === 'synced' ? 'text-green-600' :
+                lead.attio_sync_status === 'failed' ? 'text-red-600' : 'text-muted-foreground'
+              }`}>
+                {lead.attio_sync_status === 'synced' ? 'Synced' :
+                 lead.attio_sync_status === 'failed' ? 'Failed' : 'Not synced'}
+                {lead.attio_synced_at && ` (${lead.attio_synced_at.slice(0, 10)})`}
+              </span>
             </div>
           </div>
 
-          {lead.website && (
-            <a
-              href={lead.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 underline"
-            >
-              {lead.website}
-            </a>
+          {lead.reviews_raw && (
+            <div className="rounded-md bg-muted/50 p-2">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Reviews</p>
+              <div className="text-xs max-h-40 overflow-auto space-y-1.5">
+                {lead.reviews_raw.split(' | ').map((review, i) => (
+                  <div key={i}>
+                    <span className="font-semibold text-muted-foreground">Review {i + 1}:</span>{' '}
+                    {review}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
-          {lead.call_status !== 'closed' && (
+          {lead.status !== 'closed' && (
             <Button
               variant="outline"
               className="w-full"

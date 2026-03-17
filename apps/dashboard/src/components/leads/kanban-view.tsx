@@ -1,7 +1,7 @@
 'use client'
 
 import { useTransition } from 'react'
-import type { Lead, CallStatus } from '@agency-os/db'
+import type { Lead, LeadStatus } from '@agency-os/db'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,26 +11,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { STATUS_COLORS } from '@/lib/constants'
+import { STATUS_COLORS, LEAD_STATUS_LABELS } from '@/lib/constants'
 import { updateLeadStatusAction } from '@/app/leads/actions'
 import { toast } from 'sonner'
 import { ChevronRight } from 'lucide-react'
 
-const COLUMNS: { status: CallStatus; label: string }[] = [
-  { status: 'pending', label: 'Pending' },
-  { status: 'called', label: 'Called' },
-  { status: 'callback', label: 'Callback' },
-  { status: 'interested', label: 'Interested' },
-  { status: 'closed', label: 'Closed' },
-  { status: 'dead', label: 'Dead' },
+const COLUMNS: { status: LeadStatus; label: string }[] = [
+  { status: 'new', label: LEAD_STATUS_LABELS.new },
+  { status: 'scoring', label: LEAD_STATUS_LABELS.scoring },
+  { status: 'needs_review', label: LEAD_STATUS_LABELS.needs_review },
+  { status: 'approved', label: LEAD_STATUS_LABELS.approved },
+  { status: 'sent', label: LEAD_STATUS_LABELS.sent },
+  { status: 'replied', label: LEAD_STATUS_LABELS.replied },
+  { status: 'booked', label: LEAD_STATUS_LABELS.booked },
+  { status: 'closed', label: LEAD_STATUS_LABELS.closed },
+  { status: 'skip', label: LEAD_STATUS_LABELS.skip },
 ]
 
-const MOVE_OPTIONS: CallStatus[] = ['pending', 'called', 'callback', 'interested', 'closed', 'dead']
+const MOVE_OPTIONS: LeadStatus[] = ['new', 'scoring', 'needs_review', 'approved', 'sent', 'replied', 'booked', 'closed', 'skip']
 
 export function KanbanView({ leads }: { leads: Lead[] }) {
   const [isPending, startTransition] = useTransition()
 
-  function moveLead(leadId: string, newStatus: CallStatus) {
+  function moveLead(leadId: string, newStatus: LeadStatus) {
     startTransition(async () => {
       try {
         await updateLeadStatusAction(leadId, newStatus)
@@ -44,7 +47,7 @@ export function KanbanView({ leads }: { leads: Lead[] }) {
   return (
     <div className="grid grid-cols-6 gap-3">
       {COLUMNS.map((col) => {
-        const items = leads.filter((l) => l.call_status === col.status)
+        const items = leads.filter((l) => l.status === col.status)
         return (
           <div key={col.status} className="space-y-2">
             <div className="flex items-center gap-2">
@@ -61,8 +64,8 @@ export function KanbanView({ leads }: { leads: Lead[] }) {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{lead.name}</p>
                         <p className="text-xs text-muted-foreground">{lead.niche ?? lead.city ?? '—'}</p>
-                        {lead.site_quality && (
-                          <p className="text-xs text-muted-foreground">Quality: {lead.site_quality}/5</p>
+                        {lead.pain_score && (
+                          <p className="text-xs text-muted-foreground">Pain Score: {lead.pain_score}/9</p>
                         )}
                       </div>
                       <DropdownMenu>

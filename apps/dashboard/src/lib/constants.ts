@@ -1,12 +1,27 @@
-import type { CallStatus, CallOutcome, SiteStatus, ScrapeJobStatus } from '@agency-os/db'
+import type { LeadStatus, CallOutcome, SiteStatus, ScrapeJobStatus } from '@agency-os/db'
 
-export const STATUS_COLORS: Record<CallStatus, string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  called: 'bg-blue-100 text-blue-700',
-  callback: 'bg-yellow-100 text-yellow-700',
-  interested: 'bg-purple-100 text-purple-700',
-  closed: 'bg-green-100 text-green-700',
-  dead: 'bg-red-100 text-red-700',
+export const STATUS_COLORS: Record<LeadStatus, string> = {
+  new: 'bg-gray-100 text-gray-700',
+  scoring: 'bg-blue-100 text-blue-700',
+  needs_review: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-purple-100 text-purple-700',
+  sent: 'bg-indigo-100 text-indigo-700',
+  replied: 'bg-teal-100 text-teal-700',
+  booked: 'bg-green-100 text-green-700',
+  closed: 'bg-green-200 text-green-800',
+  skip: 'bg-red-100 text-red-700',
+}
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: 'New',
+  scoring: 'Scoring',
+  needs_review: 'Needs Review',
+  approved: 'Approved',
+  sent: 'Sent',
+  replied: 'Replied',
+  booked: 'Booked',
+  closed: 'Closed',
+  skip: 'Skip',
 }
 
 export const OUTCOME_LABELS: Record<CallOutcome, string> = {
@@ -16,22 +31,6 @@ export const OUTCOME_LABELS: Record<CallOutcome, string> = {
   callback_requested: 'Callback Requested',
   demo_booked: 'Demo Booked',
   closed: 'Closed',
-}
-
-export function outcomeToStatus(outcome: CallOutcome): CallStatus {
-  switch (outcome) {
-    case 'no_answer':
-    case 'voicemail':
-      return 'called'
-    case 'callback_requested':
-      return 'callback'
-    case 'demo_booked':
-      return 'interested'
-    case 'closed':
-      return 'closed'
-    case 'not_interested':
-      return 'dead'
-  }
 }
 
 export const SITE_STATUS_COLORS: Record<SiteStatus, string> = {

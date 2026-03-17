@@ -7,6 +7,7 @@ export interface RawBusiness {
   website: string | null
   rating: number | null
   review_count: number
+  reviews_raw: string | null
   maps_url: string | null
 }
 
@@ -244,11 +245,32 @@ export async function scrapeGoogleMaps(
         // Extract detail (phone, address, website)
         const detail = await extractBusinessDetail(page)
 
+        // Extract review text (up to 5 most relevant reviews)
+        let reviews_raw: string | null = null
+        try {
+          // Click the reviews tab
+          const reviewsTab = await page.$('button[aria-label*="Reviews"]')
+          if (reviewsTab) {
+            await reviewsTab.click()
+            await page.waitForTimeout(randomDelay(1500, 2500))
+
+            // Grab review text snippets
+            const reviewTexts = await page.$$eval(
+              'span.wiI7pd',
+              (els) => els.slice(0, 15).map((el) => el.textContent?.trim()).filter(Boolean)
+            )
+            if (reviewTexts.length > 0) {
+              reviews_raw = reviewTexts.join(' | ')
+            }
+          }
+        } catch {}
+
         const business: RawBusiness = {
           name: listing.name,
           maps_url: listing.href,
           rating,
           review_count,
+          reviews_raw,
           phone: detail.phone ?? null,
           address: detail.address ?? null,
           website: detail.website ?? null,
