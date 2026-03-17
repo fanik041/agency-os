@@ -324,6 +324,7 @@ Additional repository method signatures (same pattern as LeadRepository — exec
 - **`ContactRepository`** — `getAll()`, `getForLead(leadId)`, `upsert(contact)`, `update(id, updates)`, `updateTags(id, tags)`, `linkToLead(contactId, leadId)`
 - **`ResearchJobRepository`** — `getAll()`, `create(leadIds)`, `update(id, updates)`
 - **`LeadSourceRepository`** — `create(source)`, `updateCount(id, count)`
+- **`RevenueEventRepository`** — `add(event)`, `getSummary()`, `getForClient(clientId)`, `getMRR()`
 
 ### Date Normalization
 
@@ -695,7 +696,7 @@ export class AttioSyncService {
 ```typescript
 // apps/dashboard/src/services/lead-service.ts
 import { LeadRepository, LeadSourceRepository } from '@agency-os/db'
-import { LeadStatus, CallOutcome } from '@agency-os/db'
+import { LeadStatus, CallOutcome, AttioSyncStatus } from '@agency-os/db'
 import type { Lead } from '@agency-os/db'
 
 export class LeadService {
@@ -739,7 +740,7 @@ export class LeadService {
       page_load_ms: null, mobile_friendly: null, has_ssl: null,
       seo_issues: null, has_cta: null, phone_on_site: null,
       hours_on_site: null, has_social_proof: null, tech_stack: null,
-      analyze: null, status: LeadStatus.New, attio_sync_status: 'not_synced' as const,
+      analyze: null, status: LeadStatus.New, attio_sync_status: AttioSyncStatus.NotSynced,
       attio_synced_at: null, source_id: source.id,
     }))
 
@@ -781,9 +782,9 @@ export async function requireAuth() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Unauthorized')
-  return session
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) throw new Error('Unauthorized')
+  return user
 }
 ```
 
@@ -936,7 +937,7 @@ function createContainer(): Container {
 
   const leadService = new LeadService(leadRepo, sourceRepo)
   const attioSyncService = new AttioSyncService(attioClient, leadRepo)
-  const scraperService = new ScraperService(jobRepo)
+  const scraperService = new ScraperService(jobRepo, requireEnv('SCRAPER_SERVICE_URL'), process.env.SCRAPER_SECRET)
 
   return { leadRepo, callLogRepo, attioClient, leadService, attioSyncService, scraperService }
 }
@@ -963,7 +964,8 @@ import { ScrapeJobStatus } from '@agency-os/db'
 export class ScraperService {
   constructor(
     private jobRepo: ScrapeJobRepository,
-    private scraperServiceUrl: string,  // e.g. process.env.SCRAPER_SERVICE_URL
+    private scraperServiceUrl: string,
+    private scraperSecret?: string,  // optional auth token
   ) {}
 
   async createJob(params: { niches: string[]; location: string; city: string; maxPerNiche: number; withEmails: boolean }) {
@@ -976,20 +978,25 @@ export class ScraperService {
     })
   }
 
-  async triggerScrape(jobId: string, formData: {
-    niches: string[]; location: string; city: string;
+  async triggerScrape(params: {
+    niches: string[]; location: string;
     maxPerNiche: number; withEmails: boolean;
-  }): Promise<{ ok: boolean; error?: string }> {
+  }): Promise<unknown> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (this.scraperSecret) {
+      headers['Authorization'] = `Bearer ${this.scraperSecret}`
+    }
+
     const resp = await fetch(`${this.scraperServiceUrl}/scrape`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId, ...formData }),
+      headers,
+      body: JSON.stringify(params),
     })
     if (!resp.ok) {
       const err = await resp.text().catch(() => `HTTP ${resp.status}`)
-      return { ok: false, error: err }
+      throw new Error(`Scraper error: ${err}`)
     }
-    return { ok: true }
+    return resp.json()
   }
 
   async updateJobStatus(id: string, status: ScrapeJobStatus) {
@@ -1092,6 +1099,7 @@ packages/
         contact-repository.ts
         research-job-repository.ts
         lead-source-repository.ts
+        revenue-event-repository.ts
       index.ts           (UPDATED — export new modules)
   attio/                 (NEW PACKAGE)
     src/
