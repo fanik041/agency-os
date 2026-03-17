@@ -2,7 +2,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { updateClient, getClient } from '@agency-os/db'
+import { updateClient, getClient, SiteStatus } from '@agency-os/db'
 import type { GenerateSiteInput, NicheContent, DeployResult } from './types'
 import { mergeConfig } from './merge-config'
 import { deployToVercel } from './deploy-vercel'
@@ -62,7 +62,7 @@ export async function generateSite(input: GenerateSiteInput): Promise<DeployResu
       await updateClient(input.clientId, {
         site_url: result.url,
         vercel_project_id: result.projectId,
-        site_status: 'live',
+        site_status: SiteStatus.Live,
       })
     }
 

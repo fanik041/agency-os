@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Lead, CallOutcome } from '@agency-os/db'
+import type { Lead } from '@agency-os/db'
+import { CallOutcome } from '@agency-os/db'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -23,12 +24,12 @@ import { toast } from 'sonner'
 import { Briefcase, CheckCircle, MessageCircle, FileText } from 'lucide-react'
 
 const OUTCOMES: CallOutcome[] = [
-  'no_answer',
-  'voicemail',
-  'callback_requested',
-  'demo_booked',
-  'closed',
-  'not_interested',
+  CallOutcome.NoAnswer,
+  CallOutcome.Voicemail,
+  CallOutcome.CallbackRequested,
+  CallOutcome.DemoBooked,
+  CallOutcome.Closed,
+  CallOutcome.NotInterested,
 ]
 
 export function CallLoggerSheet({

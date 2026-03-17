@@ -58,6 +58,6 @@ function createContainer(): Container {
 export const container = new Proxy({} as Container, {
   get(_, prop: string) {
     if (!_container) _container = createContainer()
-    return (_container as Record<string, unknown>)[prop]
+    return (_container as unknown as Record<string, unknown>)[prop]
   },
 })
