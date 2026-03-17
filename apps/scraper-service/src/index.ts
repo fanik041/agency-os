@@ -346,6 +346,7 @@ async function runScrapeJob(
       console.log(`[Job ${jobId}] ${msg}`)
       emit('log', msg)
 
+      const scraperLog = (message: string) => emit('log', message)
       const businesses = await scrapeGoogleMaps(niche, location, maxPerNiche, async (business) => {
         // Real-time: enrich and upsert each lead as it's found
         try {
@@ -404,7 +405,7 @@ async function runScrapeJob(
           console.warn(`  ${warnMsg}`)
           emit('warn', warnMsg)
         }
-      })
+      }, scraperLog)
 
       const foundMsg = `Found ${businesses.length} businesses for "${niche}"`
       console.log(`  [Job ${jobId}] ${foundMsg}`)

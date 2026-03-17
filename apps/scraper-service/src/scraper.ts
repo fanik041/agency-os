@@ -178,7 +178,8 @@ export async function scrapeGoogleMaps(
   niche: string,
   location: string,
   maxResults: number,
-  onLead?: (business: RawBusiness) => Promise<void>
+  onLead?: (business: RawBusiness) => Promise<void>,
+  onLog?: (message: string) => void
 ): Promise<RawBusiness[]> {
   const b = await getBrowser()
   const context = await createStealthContext(b)
@@ -223,7 +224,7 @@ export async function scrapeGoogleMaps(
         const link = await page.$(`a.hfpxzc[aria-label="${listing.name.replace(/"/g, '\\"')}"]`)
         if (!link) continue
         await link.click()
-        await page.waitForTimeout(randomDelay(1500, 3000))
+        await page.waitForTimeout(randomDelay(2500, 4000))
 
         // Extract rating
         let rating: number | null = null
@@ -245,14 +246,17 @@ export async function scrapeGoogleMaps(
         // Extract detail (phone, address, website)
         const detail = await extractBusinessDetail(page)
 
-        // Extract review text (up to 5 most relevant reviews)
+        // Extract review text (up to 15 most relevant reviews)
         let reviews_raw: string | null = null
         try {
           // Click the reviews tab
           const reviewsTab = await page.$('button[aria-label*="Reviews"]')
           if (reviewsTab) {
+            const msg1 = `[Reviews] Found reviews tab for "${listing.name}", clicking...`
+            console.log(`    ${msg1}`)
+            onLog?.(msg1)
             await reviewsTab.click()
-            await page.waitForTimeout(randomDelay(1500, 2500))
+            await page.waitForTimeout(randomDelay(2500, 4000))
 
             // Grab review text snippets
             const reviewTexts = await page.$$eval(
@@ -261,9 +265,24 @@ export async function scrapeGoogleMaps(
             )
             if (reviewTexts.length > 0) {
               reviews_raw = reviewTexts.join(' | ')
+              const msg2 = `[Reviews] Scraped ${reviewTexts.length} reviews for "${listing.name}"`
+              console.log(`    ${msg2}`)
+              onLog?.(msg2)
+            } else {
+              const msg3 = `[Reviews] No review text found for "${listing.name}" (selector matched 0)`
+              console.log(`    ${msg3}`)
+              onLog?.(msg3)
             }
+          } else {
+            const msg4 = `[Reviews] No reviews tab found for "${listing.name}" (review_count: ${review_count})`
+            console.log(`    ${msg4}`)
+            onLog?.(msg4)
           }
-        } catch {}
+        } catch (err) {
+          const msg5 = `[Reviews] Error scraping reviews for "${listing.name}": ${err}`
+          console.warn(`    ${msg5}`)
+          onLog?.(msg5)
+        }
 
         const business: RawBusiness = {
           name: listing.name,
@@ -283,7 +302,7 @@ export async function scrapeGoogleMaps(
         const backButton = await page.$('button[aria-label="Back"]')
         if (backButton) {
           await backButton.click()
-          await page.waitForTimeout(randomDelay(800, 1500))
+          await page.waitForTimeout(randomDelay(1500, 2500))
         }
       } catch (err) {
         console.warn(`  Failed to extract listing "${listing.name}":`, err)
