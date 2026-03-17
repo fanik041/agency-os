@@ -165,7 +165,7 @@ export const updateSingleAttioEntrySchema = z.object({
   leadId: z.string().uuid(),
   leadName: z.string().min(1),
   recordId: z.string().min(1),
-  entryValues: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  entryValues: z.record(z.unknown()),
   changedFields: z.array(z.string()),
 })
 ```
@@ -277,7 +277,7 @@ export class LeadRepository {
     return data as Lead
   }
 
-  async upsert(lead: Omit<Lead, 'id' | 'created_at'> & { id?: string }) {
+  async upsert(lead: Omit<Lead, 'id' | 'created_at'> & { id?: string }): Promise<Lead> {
     if (lead.maps_url) {
       const { data: existing } = await supabaseAdmin
         .from('leads')
@@ -285,15 +285,19 @@ export class LeadRepository {
         .eq('maps_url', lead.maps_url)
         .maybeSingle()
       if (existing) {
-        return supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('leads')
           .update(lead)
           .eq('id', existing.id)
           .select()
           .single()
+        if (error) throw new Error(`Failed to update lead: ${error.message}`)
+        return data as Lead
       }
     }
-    return supabaseAdmin.from('leads').insert(lead).select().single()
+    const { data, error } = await supabaseAdmin.from('leads').insert(lead).select().single()
+    if (error) throw new Error(`Failed to insert lead: ${error.message}`)
+    return data as Lead
   }
 
   async getFilterOptions() {
@@ -318,23 +322,13 @@ Additional repository method signatures (same pattern as LeadRepository — exec
   - `getCount(): Promise<number>` — wraps `getLeadCount`
   - `bulkUpsert(leads): Promise<{ inserted: number; updated: number; errors: string[] }>` — wraps `bulkUpsertLeads`
   - `getMinimal(): Promise<{ id: string; name: string; niche: string; city: string }[]>` — wraps `getAllLeadsMinimal`
-- **`ClientRepository`** — `getAll()`, `getById(id)`, `create(client)`, `update(id, updates)`, `getRevenue(clientId)`
+- **`ClientRepository`** — `getAll()` (preserves `.select('*, leads(name, niche, city)')` join), `getById(id)` (same join), `create(client)`, `update(id, updates)`
 - **`ScrapeJobRepository`** — `getAll()`, `create(job)`, `update(id, updates)`
 - **`CallLogRepository`** — `log(entry)`, `getForLead(leadId)`
 - **`ContactRepository`** — `getAll()`, `getForLead(leadId)`, `upsert(contact)`, `update(id, updates)`, `updateTags(id, tags)`, `linkToLead(contactId, leadId)`
 - **`ResearchJobRepository`** — `getAll()`, `create(leadIds)`, `update(id, updates)`
 - **`LeadSourceRepository`** — `create(source)`, `updateCount(id, count)`
 - **`RevenueEventRepository`** — `add(event)`, `getSummary()`, `getForClient(clientId)`, `getMRR()`
-
-### Date Normalization
-
-Normalize ISO date strings in the repository layer before returning data:
-
-```typescript
-private normalizeDate(isoString: string): string {
-  return new Date(isoString).toISOString()
-}
-```
 
 ---
 
@@ -445,8 +439,8 @@ export class AttioClient {
 
   private parseEntry(raw: AttioListEntry): AttioEntry {
     const vals = raw.entry_values ?? {}
-    const name = (vals.company_name?.[0] as Record<string, unknown>)?.value as string
-      ?? (vals.name?.[0] as Record<string, unknown>)?.value as string
+    const name = ((vals.company_name?.[0] as Record<string, unknown>)?.value as string | undefined)
+      ?? ((vals.name?.[0] as Record<string, unknown>)?.value as string | undefined)
       ?? ''
     const flat: Record<string, unknown> = {}
     for (const [key, arr] of Object.entries(vals)) {
@@ -534,6 +528,21 @@ export class AttioSyncService {
     private attioClient: AttioClient,
     private leadRepo: LeadRepository,
   ) {}
+
+  async fetchEntries(): Promise<{
+    workspace: string
+    listName: string
+    entries: { company_name: string; values: Record<string, unknown> }[]
+  }> {
+    const { workspace } = await this.attioClient.verifyConnection()
+    const listName = await this.attioClient.getListName()
+    const entries = await this.attioClient.fetchAllEntries()
+    return {
+      workspace,
+      listName,
+      entries: entries.map(e => ({ company_name: e.name, values: e.values })),
+    }
+  }
 
   async deduplicate(): Promise<{ duplicatesFound: number; removed: number; failed: number }> {
     const entries = await this.attioClient.fetchAllEntries()
@@ -645,20 +654,6 @@ export class AttioSyncService {
     }
   }
 
-  /** Normalize a website URL to a bare domain */
-  private normalizeDomain(website: string | null): string | null {
-    if (!website) return null
-    const domain = website
-      .replace(/https?:\/\//, '')
-      .replace(/^www\./, '')
-      .replace(/[?#].*$/, '')
-      .replace(/:\d+/, '')
-      .replace(/\/.*$/, '')
-      .toLowerCase()
-      .trim()
-    return domain || null
-  }
-
   private leadToAttioValues(lead: Lead): Record<string, unknown> {
     const v: Record<string, unknown> = { company_name: lead.name }
     if (lead.website) v.website = lead.website
@@ -723,11 +718,10 @@ export class LeadService {
     email: string | null; website: string | null;
     pain_score: number | null; city: string | null;
   }>, fileName?: string) {
-    const { data: source, error } = await this.sourceRepo.create({
+    const source = await this.sourceRepo.create({
       type: 'import',
       label: fileName || `Import (${leads.length} leads)`,
     })
-    if (error || !source) throw new Error(`Failed to create source: ${error?.message}`)
 
     const leadsToInsert = leads.map(l => ({
       name: l.name, niche: l.niche, phone: l.phone, website: l.website,
@@ -780,7 +774,12 @@ export async function requireAuth() {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll(cs) { try { cs.forEach(({name, value, options}) => cookieStore.set(name, value, options)) } catch {} },
+      },
+    }
   )
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) throw new Error('Unauthorized')
@@ -829,14 +828,8 @@ export async function logCallAction(
 export async function fetchAttioEntriesAction() {
   await requireAuth()
   try {
-    const { workspace } = await container.attioClient.verifyConnection()
-    const listName = await container.attioClient.getListName()
-    const entries = await container.attioClient.fetchAllEntries()
-    const mapped = entries.map(e => ({
-      company_name: e.name,
-      values: e.values,
-    }))
-    return { ok: true as const, workspace, listName, entries: mapped }
+    const result = await container.attioSyncService.fetchEntries()
+    return { ok: true as const, ...result }
   } catch (err) {
     return { ok: false as const, error: String(err), entries: [] }
   }
@@ -901,16 +894,25 @@ Constructor injection with manual wiring via lazy Proxy singleton:
 
 ```typescript
 // apps/dashboard/src/lib/container.ts
-import { LeadRepository, LeadSourceRepository, CallLogRepository, ScrapeJobRepository } from '@agency-os/db'
+import {
+  LeadRepository, LeadSourceRepository, CallLogRepository,
+  ScrapeJobRepository, ClientRepository, ContactRepository,
+  ResearchJobRepository, RevenueEventRepository,
+} from '@agency-os/db'
 import { AttioClient } from '@agency-os/attio'
 import { AttioSyncService } from '@/services/attio-sync-service'
 import { LeadService } from '@/services/lead-service'
 import { ScraperService } from '@/services/scraper-service'
 
 interface Container {
+  // Repositories (exposed for simple controller pass-through)
   leadRepo: LeadRepository
   callLogRepo: CallLogRepository
-  attioClient: AttioClient
+  clientRepo: ClientRepository
+  contactRepo: ContactRepository
+  researchJobRepo: ResearchJobRepository
+  revenueRepo: RevenueEventRepository
+  // Services
   leadService: LeadService
   attioSyncService: AttioSyncService
   scraperService: ScraperService
@@ -925,21 +927,31 @@ function requireEnv(name: string): string {
 }
 
 function createContainer(): Container {
+  // Repositories
   const leadRepo = new LeadRepository()
   const sourceRepo = new LeadSourceRepository()
   const callLogRepo = new CallLogRepository()
   const jobRepo = new ScrapeJobRepository()
+  const clientRepo = new ClientRepository()
+  const contactRepo = new ContactRepository()
+  const researchJobRepo = new ResearchJobRepository()
+  const revenueRepo = new RevenueEventRepository()
 
+  // API Clients (internal — not exposed on Container)
   const attioClient = new AttioClient(
     requireEnv('ATTIO_API_KEY'),
     requireEnv('ATTIO_LIST_ID'),
   )
 
+  // Services
   const leadService = new LeadService(leadRepo, sourceRepo)
   const attioSyncService = new AttioSyncService(attioClient, leadRepo)
   const scraperService = new ScraperService(jobRepo, requireEnv('SCRAPER_SERVICE_URL'), process.env.SCRAPER_SECRET)
 
-  return { leadRepo, callLogRepo, attioClient, leadService, attioSyncService, scraperService }
+  return {
+    leadRepo, callLogRepo, clientRepo, contactRepo, researchJobRepo, revenueRepo,
+    leadService, attioSyncService, scraperService,
+  }
 }
 
 export const container = new Proxy({} as Container, {
@@ -1008,6 +1020,55 @@ export class ScraperService {
 }
 ```
 
+### Scraper Controller (refactored)
+
+```typescript
+// apps/dashboard/src/app/scraper/actions.ts (refactored)
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
+import { container } from '@/lib/container'
+import { z } from 'zod'
+import { ScrapeJobStatus } from '@agency-os/db'
+
+const triggerScrapeSchema = z.object({
+  niches: z.array(z.string().min(1)).min(1),
+  location: z.string().min(1),
+  maxPerNiche: z.number().int().min(1).max(100),
+  withEmails: z.boolean(),
+})
+
+export async function triggerScrape(formData: FormData) {
+  await requireAuth()
+
+  const parsed = triggerScrapeSchema.parse({
+    niches: (formData.get('niches') as string).split(',').map(n => n.trim()).filter(Boolean),
+    location: formData.get('location') as string,
+    maxPerNiche: parseInt(formData.get('maxPerNiche') as string, 10) || 20,
+    withEmails: formData.get('withEmails') === 'on',
+  })
+
+  // Create job record, then trigger scraper
+  const job = await container.scraperService.createJob({
+    ...parsed,
+    city: parsed.location,  // city derived from location
+  })
+
+  await container.scraperService.triggerScrape(parsed)
+
+  revalidatePath('/scraper')
+  return job
+}
+
+export async function updateJobStatusAction(jobId: string, status: 'done' | 'failed') {
+  await requireAuth()
+  const validStatus = z.nativeEnum(ScrapeJobStatus).parse(status)
+  await container.scraperService.updateJobStatus(jobId, validStatus)
+  revalidatePath('/scraper')
+}
+```
+
 ---
 
 ## `any` Elimination Plan
@@ -1034,7 +1095,10 @@ export class ScraperService {
 - Create `packages/db/src/enums.ts` with runtime enums
 - Create `packages/db/src/schemas.ts` with Zod schemas
 - Update `types.ts` to use enums
-- Add `zod` dependency
+- Add `zod` dependency to `packages/db/package.json`:
+  ```json
+  "dependencies": { "@supabase/supabase-js": "^2.43.0", "zod": "^3.x" }
+  ```
 
 ### Phase 2: Repository Layer
 - Create `packages/db/src/repositories/` directory
@@ -1054,17 +1118,29 @@ export class ScraperService {
 - Wire up DI container
 
 ### Phase 5: Controller Layer
-- Refactor server actions to use Zod validation + services
-- Add `requireAuth()` to every server action
+- Refactor ALL server action files to use Zod validation + services:
+  - `leads/actions.ts` — shown in spec
+  - `scraper/actions.ts` — shown in spec
+  - `clients/actions.ts` — `createClientAction`, `convertLeadToClientAction`, `updateClientAction`
+  - `contacts/actions.ts` — `triggerResearchAction`, `updateContactTagsAction`, `updateContactNotesAction`, `linkContactToLeadAction`
+  - `revenue/actions.ts` — `addRevenueEventAction`
+  - `login/actions.ts` — auth-related (may not need `requireAuth`)
+- Add `requireAuth()` to every server action (except login)
+- Add Zod schemas for clients, contacts, and revenue actions
 - Remove all inline fetch calls
+- Fix pre-existing bug: `convertLeadToClientAction` reads `lead.email` but `Lead` interface has `email_found` — change to `lead.email_found`
+- Fix pre-existing bug: `leads/page.tsx` passes `minQuality` filter key but `getPaginated` expects `minPainScore` — rename to match
 
 ### Phase 6: Cleanup
 - Remove `any` types
-- Remove old `queries.ts` functions (replaced by repositories)
-- Update component imports
+- Keep `queries.ts` as re-exports (do NOT remove) — `apps/scraper-service/src/index.ts` imports directly from `@agency-os/db` using the old function names (`createScrapeJob`, `updateScrapeJob`, `upsertLead`, etc.)
+- Update dashboard component imports
 - Verify `Database` type in `types.ts` propagates correctly with enum-typed interfaces
 
-**Note:** The `Database` type (types.ts lines 154-199) references `Lead`, `Client`, etc. via `Row`/`Insert`/`Update` types. Since these interfaces are updated to use enums, the `Database` type will propagate automatically. Verify during cleanup that Supabase client type inference still works correctly.
+**Notes:**
+- The `Database` type (types.ts lines 154-199) references `Lead`, `Client`, etc. via `Row`/`Insert`/`Update` types. Since these interfaces are updated to use enums, the `Database` type will propagate automatically. Verify during cleanup that Supabase client type inference still works correctly.
+- `queries.ts` must remain as a backward-compat re-export layer because `apps/scraper-service` depends on it. These re-exports can be removed only when `scraper-service` is refactored to use repositories directly (out of scope for this refactor).
+- `ClientRepository.getAll()` must preserve the existing join: `.select('*, leads(name, niche, city)')` — the clients page depends on the nested `leads` relation data.
 
 ---
 
@@ -1120,6 +1196,9 @@ apps/dashboard/src/
   app/
     leads/actions.ts     (REFACTORED)
     scraper/actions.ts   (REFACTORED)
+    clients/actions.ts   (REFACTORED — add auth + validation)
+    contacts/actions.ts  (REFACTORED — add auth + validation)
+    revenue/actions.ts   (REFACTORED — add auth + validation)
 ```
 
 ---
@@ -1129,6 +1208,6 @@ apps/dashboard/src/
 1. **Supabase JS kept** (not pg.Pool) — stateless HTTP avoids connection exhaustion in serverless
 2. **Constructor injection** — manual wiring via lazy Proxy singleton in `container.ts`
 3. **Zod for validation** — `z.nativeEnum()` for enum validation, `safeParse` at boundaries
-4. **Date normalization in repository layer** — consistent ISO format
+4. **`queries.ts` kept as re-exports** — `apps/scraper-service` depends on old function names
 5. **Attio types from codebase usage** (not full OpenAPI) — typed from actual field usage
 6. **Server action signatures preserved** — existing parameter signatures kept, Zod validates internally to avoid breaking frontend call sites
