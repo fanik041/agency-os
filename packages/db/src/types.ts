@@ -1,20 +1,29 @@
-export type LeadStatus = 'new' | 'scoring' | 'needs_review' | 'approved' | 'sent' | 'replied' | 'booked' | 'closed' | 'skip'
-export type AttioSyncStatus = 'not_synced' | 'synced' | 'failed'
+import type {
+  LeadStatus,
+  AttioSyncStatus,
+  ScrapeJobStatus,
+  CallOutcome,
+  RevenueType,
+  SiteStatus,
+  ContactSource,
+  LeadSourceType,
+  ResearchJobStatus,
+} from './enums'
+
+export type {
+  LeadStatus,
+  AttioSyncStatus,
+  ScrapeJobStatus,
+  CallOutcome,
+  RevenueType,
+  SiteStatus,
+  ContactSource,
+  LeadSourceType,
+  ResearchJobStatus,
+} from './enums'
+
 /** @deprecated Use LeadStatus instead */
 export type CallStatus = LeadStatus
-export type SiteStatus = 'building' | 'live' | 'paused'
-export type ScrapeJobStatus = 'queued' | 'running' | 'done' | 'failed'
-export type CallOutcome =
-  | 'no_answer'
-  | 'voicemail'
-  | 'not_interested'
-  | 'callback_requested'
-  | 'demo_booked'
-  | 'closed'
-export type RevenueType = 'deposit' | 'final' | 'retainer'
-export type ResearchJobStatus = 'queued' | 'running' | 'done' | 'failed'
-export type ContactSource = 'google_linkedin' | 'website_about' | 'website_contact' | 'manual'
-export type LeadSourceType = 'scrape' | 'import' | 'manual'
 
 export interface Lead {
   id: string
