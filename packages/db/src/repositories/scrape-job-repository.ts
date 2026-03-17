@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../client'
 import type { ScrapeJob } from '../types'
+import { ScrapeJobStatus } from '../enums'
 
 export class ScrapeJobRepository {
   async getAll(): Promise<ScrapeJob[]> {
@@ -15,7 +16,7 @@ export class ScrapeJobRepository {
   async create(job: Pick<ScrapeJob, 'niches' | 'location' | 'city' | 'max_per_niche' | 'with_emails'>): Promise<ScrapeJob> {
     const { data, error } = await supabaseAdmin
       .from('scrape_jobs')
-      .insert({ ...job, status: 'queued' as const, leads_found: 0 })
+      .insert({ ...job, status: ScrapeJobStatus.Queued, leads_found: 0 })
       .select()
       .single()
     if (error) throw new Error(`Failed to create scrape job: ${error.message}`)

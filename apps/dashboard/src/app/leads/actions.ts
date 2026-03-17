@@ -31,7 +31,7 @@ export async function logCallAction(
     container.callLogRepo.log({
       lead_id: parsed.leadId,
       outcome: parsed.outcome,
-      notes: parsed.notes || null,
+      notes: parsed.notes || '',
       duration_seconds: parsed.durationSeconds,
     }),
     container.leadService.updateStatus(parsed.leadId, newStatus, parsed.notes || undefined),

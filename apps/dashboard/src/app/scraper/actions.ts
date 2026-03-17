@@ -15,11 +15,17 @@ export async function triggerScrape(formData: FormData) {
     withEmails: formData.get('withEmails') === 'on',
   })
 
-  await container.scraperService.createJob({ ...parsed, city: parsed.location })
-  const result = await container.scraperService.triggerScrape(parsed)
+  const job = await container.scraperService.createJob({ ...parsed, city: parsed.location })
 
-  revalidatePath('/scraper')
-  return result
+  try {
+    const result = await container.scraperService.triggerScrape(parsed)
+    revalidatePath('/scraper')
+    return result
+  } catch (err) {
+    await container.scraperService.updateJobStatus(job.id, ScrapeJobStatus.Failed)
+    revalidatePath('/scraper')
+    throw err
+  }
 }
 
 export async function updateJobStatusAction(jobId: string, status: 'done' | 'failed') {

@@ -45,7 +45,12 @@ export async function createClientAction(formData: FormData) {
 export async function convertLeadToClientAction(leadId: string) {
   await requireAuth()
 
-  const lead = await container.leadRepo.getById(leadId)
+  let lead
+  try {
+    lead = await container.leadRepo.getById(leadId)
+  } catch {
+    throw new Error('Lead not found')
+  }
 
   await container.clientRepo.create({
     lead_id: leadId,

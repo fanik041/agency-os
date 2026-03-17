@@ -38,6 +38,7 @@ export class AttioClient {
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify({ limit: pageSize, offset }),
+        cache: 'no-store',
       })
       if (!resp.ok) throw new Error(`Failed to fetch entries: HTTP ${resp.status}`)
 

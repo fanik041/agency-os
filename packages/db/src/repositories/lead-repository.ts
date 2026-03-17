@@ -43,7 +43,7 @@ export class LeadRepository {
     if (filters.city) query = query.eq('city', filters.city)
     if (filters.niche) query = query.eq('niche', filters.niche)
     if (filters.status) query = query.eq('status', filters.status)
-    if (filters.minPainScore) query = query.gte('pain_score', filters.minPainScore)
+    if (filters.minPainScore != null) query = query.gte('pain_score', filters.minPainScore)
     if (filters.q) query = query.ilike('name', `%${filters.q}%`)
     if (filters.sourceId) query = query.eq('source_id', filters.sourceId)
 

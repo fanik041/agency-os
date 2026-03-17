@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../client'
 import type { ResearchJob } from '../types'
+import { ResearchJobStatus } from '../enums'
 
 export class ResearchJobRepository {
   async getAll(): Promise<ResearchJob[]> {
@@ -15,7 +16,7 @@ export class ResearchJobRepository {
   async create(leadIds: string[]): Promise<ResearchJob> {
     const { data, error } = await supabaseAdmin
       .from('research_jobs')
-      .insert({ status: 'queued' as const, lead_ids: leadIds, total: leadIds.length, processed: 0, contacts_found: 0 })
+      .insert({ status: ResearchJobStatus.Queued, lead_ids: leadIds, total: leadIds.length, processed: 0, contacts_found: 0 })
       .select()
       .single()
     if (error) throw new Error(`Failed to create research job: ${error.message}`)

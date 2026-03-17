@@ -1,5 +1,5 @@
 import type { LeadRepository, LeadSourceRepository } from '@agency-os/db'
-import { LeadStatus, CallOutcome, AttioSyncStatus } from '@agency-os/db'
+import { LeadStatus, CallOutcome, AttioSyncStatus, LeadSourceType } from '@agency-os/db'
 
 export class LeadService {
   constructor(
@@ -26,7 +26,7 @@ export class LeadService {
     pain_score: number | null; city: string | null;
   }>, fileName?: string) {
     const source = await this.sourceRepo.create({
-      type: 'import',
+      type: LeadSourceType.Import,
       label: fileName || `Import (${leads.length} leads)`,
     })
 
