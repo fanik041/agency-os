@@ -21,7 +21,6 @@ interface LeadRow {
   name: string
   website: string | null
   phone: string | null
-  place_id: string | null
   address: string | null
   city: string | null
   niche: string | null

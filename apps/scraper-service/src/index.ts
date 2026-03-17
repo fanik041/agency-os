@@ -361,16 +361,10 @@ async function runScrapeJob(
           emit('lead', `Found: ${enriched.name}`, leadData)
 
           // Persist to DB (non-blocking for the lead stream)
-          // Extract place_id from maps_url if present (only real Place IDs starting with ChIJ)
-          const placeIdMatch = enriched.maps_url?.match(/place_id[=:]([^&/]+)/) ??
-            enriched.maps_url?.match(/(ChIJ[A-Za-z0-9_-]+)/)
-          const placeId = placeIdMatch?.[1] ?? null
-
           const { error } = await upsertLead({
             ...enriched,
             niche,
             city,
-            place_id: placeId,
             has_booking: false,
             has_chat_widget: false,
             has_contact_form: false,

@@ -173,7 +173,7 @@ export class AttioSyncService {
     const v: Record<string, unknown> = { company_name: lead.name }
     if (lead.website) v.website = lead.website
     if (lead.phone) v.phone = lead.phone
-    if (lead.place_id) v.place_id = lead.place_id
+    if (lead.address) v.place_id = lead.address
     if (lead.reviews_raw) v.reviews_raw = lead.reviews_raw
     if (lead.pain_points) v.pain_points = lead.pain_points
     if (lead.suggested_angle) v.suggested_angle = lead.suggested_angle

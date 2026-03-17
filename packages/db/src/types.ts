@@ -30,7 +30,6 @@ export interface Lead {
   name: string
   website: string | null
   phone: string | null
-  place_id: string | null
   has_booking: boolean
   has_chat_widget: boolean
   has_contact_form: boolean

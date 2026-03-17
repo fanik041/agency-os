@@ -33,7 +33,7 @@ export class LeadService {
     const leadsToInsert = leads.map(l => ({
       name: l.name, niche: l.niche, phone: l.phone, website: l.website,
       address: null, rating: null, review_count: 0, maps_url: null,
-      place_id: null, city: l.city, has_website: !!l.website,
+      city: l.city, has_website: !!l.website,
       site_quality: null, pain_score: l.pain_score, pain_points: null,
       suggested_angle: null, message_draft: null, email_found: l.email,
       has_booking: false, has_chat_widget: false, has_contact_form: false,
