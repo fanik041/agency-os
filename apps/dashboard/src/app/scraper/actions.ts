@@ -1,53 +1,30 @@
 'use server'
 
-import { updateScrapeJob } from '@agency-os/db'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
+import { container } from '@/lib/container'
+import { triggerScrapeSchema, updateJobStatusSchema, ScrapeJobStatus } from '@agency-os/db'
 
 export async function triggerScrape(formData: FormData) {
-  const nichesRaw = formData.get('niches') as string
-  const location = formData.get('location') as string
-  const maxPerNiche = parseInt(formData.get('maxPerNiche') as string, 10) || 20
-  const withEmails = formData.get('withEmails') === 'on'
+  await requireAuth()
 
-  const niches = nichesRaw
-    .split(',')
-    .map((n) => n.trim())
-    .filter(Boolean)
-
-  if (niches.length === 0 || !location) {
-    throw new Error('Niches and location are required')
-  }
-
-  const scraperUrl = process.env.SCRAPER_SERVICE_URL
-  if (!scraperUrl) {
-    throw new Error('SCRAPER_SERVICE_URL is not configured')
-  }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (process.env.SCRAPER_SECRET) {
-    headers['Authorization'] = `Bearer ${process.env.SCRAPER_SECRET}`
-  }
-
-  const res = await fetch(`${scraperUrl}/scrape`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ niches, location, maxPerNiche, withEmails }),
+  const parsed = triggerScrapeSchema.parse({
+    niches: (formData.get('niches') as string).split(',').map(n => n.trim()).filter(Boolean),
+    location: formData.get('location') as string,
+    maxPerNiche: parseInt(formData.get('maxPerNiche') as string, 10) || 20,
+    withEmails: formData.get('withEmails') === 'on',
   })
 
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Scraper error: ${text}`)
-  }
+  await container.scraperService.createJob({ ...parsed, city: parsed.location })
+  const result = await container.scraperService.triggerScrape(parsed)
 
   revalidatePath('/scraper')
-  return res.json()
+  return result
 }
 
 export async function updateJobStatusAction(jobId: string, status: 'done' | 'failed') {
-  const { error } = await updateScrapeJob(jobId, {
-    status,
-    finished_at: new Date().toISOString(),
-  })
-  if (error) throw new Error(error.message)
+  await requireAuth()
+  const parsed = updateJobStatusSchema.parse({ jobId, status })
+  await container.scraperService.updateJobStatus(parsed.jobId, parsed.status as ScrapeJobStatus)
   revalidatePath('/scraper')
 }
