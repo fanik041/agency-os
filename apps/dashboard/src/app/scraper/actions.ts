@@ -31,6 +31,7 @@ export async function triggerScrape(formData: FormData) {
 export async function updateJobStatusAction(jobId: string, status: 'done' | 'failed') {
   await requireAuth()
   const parsed = updateJobStatusSchema.parse({ jobId, status })
-  await container.scraperService.updateJobStatus(parsed.jobId, parsed.status as ScrapeJobStatus)
+  const statusEnum = parsed.status === 'done' ? ScrapeJobStatus.Done : ScrapeJobStatus.Failed
+  await container.scraperService.updateJobStatus(parsed.jobId, statusEnum)
   revalidatePath('/scraper')
 }

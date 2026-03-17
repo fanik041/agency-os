@@ -3,8 +3,10 @@
 import { generateSite } from '@agency-os/site-generator'
 import type { GenerateSiteInput } from '@agency-os/site-generator'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 
 export async function deploySiteAction(formData: FormData) {
+  await requireAuth()
   const input: GenerateSiteInput = {
     clientId: formData.get('clientId') as string,
     niche: formData.get('niche') as string,

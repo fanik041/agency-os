@@ -71,9 +71,11 @@ export class LeadRepository {
   }
 
   async updateStatus(id: string, status: LeadStatus, notes?: string): Promise<Lead> {
+    const updates: Record<string, unknown> = { status }
+    if (notes !== undefined) updates.notes = notes
     const { data, error } = await supabaseAdmin
       .from('leads')
-      .update({ status, notes })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

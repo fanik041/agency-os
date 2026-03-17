@@ -44,6 +44,8 @@ export async function createClientAction(formData: FormData) {
 
 export async function convertLeadToClientAction(leadId: string) {
   await requireAuth()
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(leadId)) throw new Error('Invalid lead ID')
 
   let lead
   try {
