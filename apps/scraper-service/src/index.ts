@@ -815,7 +815,13 @@ app.post('/analyze', authMiddleware, async (req, res) => {
 const PORT = process.env.PORT || 3001
 
 // Validate env on startup
-const required = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY']
+const required = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
+const optional = ['OPENAI_API_KEY']
+for (const key of optional) {
+  if (!process.env[key]) {
+    console.warn(`Warning: ${key} not set — /score/stream will not work`)
+  }
+}
 for (const key of required) {
   if (!process.env[key]) {
     console.error(`Missing required env var: ${key}`)
