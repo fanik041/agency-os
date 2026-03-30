@@ -22,6 +22,8 @@ const colorMap: Record<LogType, string> = {
   contact: 'text-emerald-400',
 }
 
+const MAX_RETRIES = 5
+
 export function ResearchLogModal({
   open,
   onOpenChange,
@@ -52,31 +54,26 @@ export function ResearchLogModal({
     if (!open || leadIds.length === 0 || startedRef.current) return
     startedRef.current = true
 
-    async function runResearch() {
-      setLoading(true)
-      setLogs([])
-      setStats(null)
-
-      addLog(`Starting research for ${leadIds.length} lead(s)...`)
+    async function streamResearch(ids: string[]): Promise<{ processedIds: Set<string>; receivedDone: boolean }> {
+      const processedIds = new Set<string>()
+      let receivedDone = false
 
       try {
         const resp = await fetch('/api/research/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadIds }),
+          body: JSON.stringify({ leadIds: ids }),
         })
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ error: 'Request failed' }))
           addLog(`Error: ${err.error || resp.statusText}`, 'error')
-          setLoading(false)
-          return
+          return { processedIds, receivedDone: false }
         }
 
         if (!resp.body) {
           addLog('Error: No response stream', 'error')
-          setLoading(false)
-          return
+          return { processedIds, receivedDone: false }
         }
 
         const reader = resp.body.getReader()
@@ -99,6 +96,14 @@ export function ResearchLogModal({
 
               if (type === 'log') {
                 addLog(evt.message, 'info')
+                // Track processed leads from log messages like "[X/Y] ... "lead name"..."
+                const match = evt.message.match(/Done — \d+ contacts \((\d+)\/\d+ leads processed\)/)
+                if (match) {
+                  const idx = parseInt(match[1], 10) - 1
+                  if (idx >= 0 && idx < ids.length) {
+                    processedIds.add(ids[idx])
+                  }
+                }
               } else if (type === 'warn') {
                 addLog(evt.message, 'warn')
               } else if (type === 'error') {
@@ -106,6 +111,7 @@ export function ResearchLogModal({
               } else if (type === 'contact') {
                 addLog(evt.message, 'contact')
               } else if (type === 'done') {
+                receivedDone = true
                 addLog(evt.message, 'done')
                 if (evt.data) {
                   setStats({
@@ -121,12 +127,49 @@ export function ResearchLogModal({
           }
         }
       } catch (err) {
-        addLog(`Fatal error: ${err instanceof Error ? err.message : String(err)}`, 'error')
-      } finally {
-        setLoading(false)
-        router.refresh()
-        onComplete?.()
+        addLog(`Connection error: ${err instanceof Error ? err.message : String(err)}`, 'error')
       }
+
+      return { processedIds, receivedDone }
+    }
+
+    async function runResearch() {
+      setLoading(true)
+      setLogs([])
+      setStats(null)
+
+      addLog(`Starting research for ${leadIds.length} lead(s)...`)
+
+      let remainingIds = [...leadIds]
+      let retryCount = 0
+
+      while (retryCount < MAX_RETRIES) {
+        const { processedIds, receivedDone } = await streamResearch(remainingIds)
+
+        if (receivedDone) break
+
+        // Stream ended without "done" — connection dropped
+        remainingIds = remainingIds.filter(id => !processedIds.has(id))
+
+        if (remainingIds.length === 0) {
+          addLog('All leads processed.', 'done')
+          break
+        }
+
+        retryCount++
+        addLog(`Connection dropped. Resuming with ${remainingIds.length} remaining lead(s)... (retry ${retryCount}/${MAX_RETRIES})`, 'warn')
+
+        // Brief pause before retry
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+
+      if (retryCount >= MAX_RETRIES) {
+        addLog(`Max retries reached. ${remainingIds.length} lead(s) were not processed.`, 'error')
+      }
+
+      setLoading(false)
+      router.refresh()
+      onComplete?.()
     }
 
     runResearch()

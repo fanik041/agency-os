@@ -29,6 +29,8 @@ interface ScoringStats {
   totalProducts: number
 }
 
+const MAX_RETRIES = 5
+
 export function ScoreLeadsButton() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -46,15 +48,8 @@ export function ScoreLeadsButton() {
     setLogs(prev => [...prev, { text, type }])
   }, [])
 
-  async function handleScore() {
-    if (startedRef.current) return
-    startedRef.current = true
-    setLoading(true)
-    setLogs([])
-    setStats(null)
-    setOpen(true)
-
-    addLog('Connecting to scoring pipeline...')
+  async function streamScoring(): Promise<boolean> {
+    let receivedDone = false
 
     try {
       const resp = await fetch('/api/score/stream', {
@@ -66,16 +61,12 @@ export function ScoreLeadsButton() {
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: 'Request failed' }))
         addLog(`Error: ${err.error || resp.statusText}`, 'error')
-        setLoading(false)
-        startedRef.current = false
-        return
+        return false
       }
 
       if (!resp.body) {
         addLog('Error: No response stream', 'error')
-        setLoading(false)
-        startedRef.current = false
-        return
+        return false
       }
 
       const reader = resp.body.getReader()
@@ -105,6 +96,7 @@ export function ScoreLeadsButton() {
             } else if (type === 'scored') {
               addLog(evt.message, 'scored')
             } else if (type === 'done') {
+              receivedDone = true
               addLog(evt.message, 'done')
               if (evt.data) {
                 setStats({
@@ -121,12 +113,42 @@ export function ScoreLeadsButton() {
         }
       }
     } catch (err) {
-      addLog(`Fatal error: ${err instanceof Error ? err.message : String(err)}`, 'error')
-    } finally {
-      setLoading(false)
-      startedRef.current = false
-      router.refresh()
+      addLog(`Connection error: ${err instanceof Error ? err.message : String(err)}`, 'error')
     }
+
+    return receivedDone
+  }
+
+  async function handleScore() {
+    if (startedRef.current) return
+    startedRef.current = true
+    setLoading(true)
+    setLogs([])
+    setStats(null)
+    setOpen(true)
+
+    addLog('Connecting to scoring pipeline...')
+
+    let retryCount = 0
+
+    while (retryCount < MAX_RETRIES) {
+      const receivedDone = await streamScoring()
+
+      if (receivedDone) break
+
+      retryCount++
+      // Scoring endpoint auto-skips already-scored leads, so retrying picks up where it left off
+      addLog(`Connection dropped. Resuming scoring... (retry ${retryCount}/${MAX_RETRIES})`, 'warn')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+
+    if (retryCount >= MAX_RETRIES) {
+      addLog('Max retries reached. Some leads may not have been scored.', 'error')
+    }
+
+    setLoading(false)
+    startedRef.current = false
+    router.refresh()
   }
 
   function handleClose() {

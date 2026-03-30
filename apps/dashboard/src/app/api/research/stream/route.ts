@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 900 // 15 minutes — enterprise tier
 
 import { requireAuth } from '@/lib/auth'
 
