@@ -176,8 +176,8 @@ export function SyncAttioButton() {
         {loading ? 'Syncing...' : 'Sync to Attio'}
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <Dialog open={open} onOpenChange={(value) => { if (loading && !value) return; setOpen(value) }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onPointerDownOutside={(e) => { if (loading) e.preventDefault() }} onEscapeKeyDown={(e) => { if (loading) e.preventDefault() }}>
           <DialogHeader>
             <DialogTitle>
               {loading ? 'Syncing to Attio...' : 'Sync Complete'}

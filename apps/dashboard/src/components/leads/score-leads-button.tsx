@@ -151,8 +151,9 @@ export function ScoreLeadsButton() {
     router.refresh()
   }
 
-  function handleClose() {
-    setOpen(false)
+  function handleOpenChange(value: boolean) {
+    if (loading && !value) return
+    setOpen(value)
   }
 
   const progressText = () => {
@@ -174,8 +175,8 @@ export function ScoreLeadsButton() {
         {loading ? 'Scoring...' : 'Score Leads'}
       </Button>
 
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onPointerDownOutside={(e) => { if (loading) e.preventDefault() }} onEscapeKeyDown={(e) => { if (loading) e.preventDefault() }}>
           <DialogHeader>
             <DialogTitle>
               {loading ? 'Scoring Leads with AI...' : 'Scoring Complete'}
@@ -196,7 +197,7 @@ export function ScoreLeadsButton() {
 
           {!loading && (
             <div className="flex justify-end pt-2">
-              <Button size="sm" onClick={handleClose}>Close</Button>
+              <Button size="sm" onClick={() => setOpen(false)}>Close</Button>
             </div>
           )}
         </DialogContent>

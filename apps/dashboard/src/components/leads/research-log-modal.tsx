@@ -175,9 +175,11 @@ export function ResearchLogModal({
     runResearch()
   }, [open, leadIds, addLog, router, onComplete])
 
-  function handleClose() {
-    startedRef.current = false
-    onOpenChange(false)
+  function handleOpenChange(value: boolean) {
+    // Prevent dismissal while loading — clicking outside or pressing Escape does nothing
+    if (loading && !value) return
+    if (!value) startedRef.current = false
+    onOpenChange(value)
   }
 
   const progressText = () => {
@@ -188,8 +190,8 @@ export function ResearchLogModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onPointerDownOutside={(e) => { if (loading) e.preventDefault() }} onEscapeKeyDown={(e) => { if (loading) e.preventDefault() }}>
         <DialogHeader>
           <DialogTitle>
             {loading ? 'Researching Contacts...' : 'Research Complete'}
@@ -210,7 +212,7 @@ export function ResearchLogModal({
 
         {!loading && (
           <div className="flex justify-end pt-2">
-            <Button size="sm" onClick={handleClose}>Close</Button>
+            <Button size="sm" onClick={() => onOpenChange(false)}>Close</Button>
           </div>
         )}
       </DialogContent>
