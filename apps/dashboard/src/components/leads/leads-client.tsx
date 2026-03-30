@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import type { Lead, LeadSource } from '@agency-os/db'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { KanbanView } from './kanban-view'
 import { CallLoggerSheet } from './call-logger-sheet'
 import { LeadFilters } from './lead-filters'
 import { PaginationControls } from './pagination-controls'
-import { triggerResearchAction } from '@/app/contacts/actions'
+import { ResearchLogModal } from './research-log-modal'
 import { toast } from 'sonner'
 import { UserSearch, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -34,7 +34,8 @@ export function LeadsClient({
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isPending, startTransition] = useTransition()
+  const [researchOpen, setResearchOpen] = useState(false)
+  const [researchLeadIds, setResearchLeadIds] = useState<string[]>([])
 
   function handleSelectLead(lead: Lead) {
     setSelectedLead(lead)
@@ -42,16 +43,12 @@ export function LeadsClient({
   }
 
   function handleResearchSelected() {
-    const ids = Array.from(selectedIds)
-    startTransition(async () => {
-      try {
-        await triggerResearchAction(ids)
-        toast.success(`Research started for ${ids.length} lead${ids.length !== 1 ? 's' : ''}`)
-        setSelectedIds(new Set())
-      } catch {
-        toast.error('Failed to start research')
-      }
-    })
+    setResearchLeadIds(Array.from(selectedIds))
+    setResearchOpen(true)
+  }
+
+  function handleResearchComplete() {
+    setSelectedIds(new Set())
   }
 
   function handleExportXlsx() {
@@ -92,9 +89,9 @@ export function LeadsClient({
             Export XLSX
           </Button>
           {selectedIds.size > 0 && (
-            <Button onClick={handleResearchSelected} disabled={isPending} size="sm">
+            <Button onClick={handleResearchSelected} size="sm">
               <UserSearch className="mr-2 h-4 w-4" />
-              {isPending ? 'Starting...' : `Research Selected (${selectedIds.size})`}
+              Research Selected ({selectedIds.size})
             </Button>
           )}
         </div>
@@ -112,6 +109,10 @@ export function LeadsClient({
             onSelectLead={handleSelectLead}
             selectedIds={selectedIds}
             onSelectedIdsChange={setSelectedIds}
+            onResearchLead={(leadId) => {
+              setResearchLeadIds([leadId])
+              setResearchOpen(true)
+            }}
           />
         </TabsContent>
 
@@ -123,6 +124,13 @@ export function LeadsClient({
       <PaginationControls totalCount={totalCount} page={page} perPage={perPage} />
 
       <CallLoggerSheet lead={selectedLead} open={sheetOpen} onOpenChange={setSheetOpen} />
+
+      <ResearchLogModal
+        open={researchOpen}
+        onOpenChange={setResearchOpen}
+        leadIds={researchLeadIds}
+        onComplete={handleResearchComplete}
+      />
     </>
   )
 }

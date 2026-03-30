@@ -54,7 +54,8 @@
       "Bash(xargs -I {} basename {})",
       "Bash(gh api:*)",
       "Bash(find /Users/fahimanik/code/agency-os/apps/dashboard/src/app -name *leads* -o -name *lead*)",
-      "Bash(grep -r \"XLSX\\\\|xlsx\\\\|\\\\.write\" /Users/fahimanik/code/agency-os/apps/dashboard/src --include=*.ts --include=*.tsx)"
+      "Bash(grep -r \"XLSX\\\\|xlsx\\\\|\\\\.write\" /Users/fahimanik/code/agency-os/apps/dashboard/src --include=*.ts --include=*.tsx)",
+      "Bash(npx tsc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

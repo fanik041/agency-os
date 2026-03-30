@@ -456,9 +456,55 @@ app.post('/research', authMiddleware, async (req, res) => {
   runResearchJob(job.id, leadIds)
 })
 
-async function runResearchJob(jobId: string, leadIds: string[]) {
+// ── POST /research/stream — SSE endpoint ─────────────────────────
+app.post('/research/stream', authMiddleware, async (req, res) => {
+  const { leadIds } = req.body
+
+  if (!leadIds?.length) {
+    return res.status(400).json({ error: 'leadIds (array) is required' })
+  }
+
+  const { data: job, error } = await createResearchJob(leadIds)
+
+  if (error || !job) {
+    return res.status(500).json({ error: 'Failed to create research job', detail: error?.message })
+  }
+
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  })
+
+  const send = (type: string, message: string, data?: any) => {
+    const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
+    res.write(`data: ${payload}\n\n`)
+  }
+
+  let disconnected = false
+  req.on('close', () => { disconnected = true })
+
+  const onLog = (type: string, message: string, data?: any) => {
+    if (!disconnected) send(type, message, data)
+  }
+
+  await runResearchJob(job.id, leadIds, onLog)
+
+  if (!disconnected) res.end()
+})
+
+async function runResearchJob(
+  jobId: string,
+  leadIds: string[],
+  onLog?: (type: string, message: string, data?: any) => void,
+) {
   let processed = 0
   let contactsFound = 0
+
+  const emit = (type: string, message: string, data?: any) => {
+    if (onLog) onLog(type, message, data)
+  }
 
   try {
     await updateResearchJob(jobId, {
@@ -466,15 +512,19 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
       started_at: new Date().toISOString(),
     })
 
+    emit('log', `Research job ${jobId} started — ${leadIds.length} lead(s) to process`)
+
     for (const leadId of leadIds) {
       try {
         const { data: lead } = await getLeadById(leadId)
         if (!lead) {
+          emit('warn', `[${processed + 1}/${leadIds.length}] Lead ${leadId} not found, skipping`)
           processed++
           await updateResearchJob(jobId, { processed })
           continue
         }
 
+        emit('log', `[${processed + 1}/${leadIds.length}] Researching "${lead.name}"...`)
         console.log(`[Research ${jobId}] Searching for decision makers: ${lead.name}`)
 
         const contacts = await searchDecisionMakers({
@@ -482,6 +532,8 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
           city: lead.city,
           website: lead.website,
         })
+
+        emit('log', `  Found ${contacts.length} contact(s) for "${lead.name}"`)
 
         for (const contact of contacts) {
           const { error } = await upsertContact({
@@ -496,13 +548,21 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
             notes: null,
             tags: [],
           })
-          if (!error) contactsFound++
+          if (!error) {
+            contactsFound++
+            emit('contact', `  + ${contact.name} (${contact.title ?? 'no title'}) — ${contact.email ?? 'no email'}`, contact)
+          } else {
+            emit('warn', `  Failed to save contact "${contact.name}": ${error.message}`)
+          }
         }
 
         processed++
         await updateResearchJob(jobId, { processed, contacts_found: contactsFound })
+        emit('log', `  Done — ${contacts.length} contacts (${processed}/${leadIds.length} leads processed)`)
         console.log(`[Research ${jobId}] ${lead.name}: found ${contacts.length} contacts (${processed}/${leadIds.length})`)
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        emit('error', `[${processed + 1}/${leadIds.length}] Failed for "${leadId}": ${errMsg}`)
         console.warn(`[Research ${jobId}] Failed for lead ${leadId}:`, err)
         processed++
         await updateResearchJob(jobId, { processed })
@@ -515,7 +575,9 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
       contacts_found: contactsFound,
       finished_at: new Date().toISOString(),
     })
-    console.log(`[Research ${jobId}] Complete — ${contactsFound} contacts found`)
+    const doneMsg = `Research complete — ${contactsFound} contacts found across ${processed} leads`
+    console.log(`[Research ${jobId}] ${doneMsg}`)
+    emit('done', doneMsg, { processed, contactsFound })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[Research ${jobId}] Failed:`, message)
@@ -524,6 +586,7 @@ async function runResearchJob(jobId: string, leadIds: string[]) {
       error_message: message,
       finished_at: new Date().toISOString(),
     })
+    emit('error', `Fatal error: ${message}`)
   }
 }
 

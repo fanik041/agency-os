@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/table'
 import { STATUS_COLORS, LEAD_STATUS_LABELS } from '@/lib/constants'
 import { convertLeadToClientAction } from '@/app/clients/actions'
-import { triggerResearchAction } from '@/app/contacts/actions'
 import { toast } from 'sonner'
 import { MoreHorizontal, Briefcase, UserSearch, ChevronDown, ChevronRight } from 'lucide-react'
 
@@ -30,11 +29,13 @@ export function LeadsTable({
   onSelectLead,
   selectedIds,
   onSelectedIdsChange,
+  onResearchLead,
 }: {
   leads: Lead[]
   onSelectLead: (lead: Lead) => void
   selectedIds: Set<string>
   onSelectedIdsChange: (ids: Set<string>) => void
+  onResearchLead?: (leadId: string) => void
 }) {
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id))
 
@@ -101,6 +102,7 @@ export function LeadsTable({
                 onSelectLead={onSelectLead}
                 selected={selectedIds.has(lead.id)}
                 onSelectedChange={(checked) => handleSelectOne(lead.id, checked)}
+                onResearchLead={onResearchLead}
               />
             ))
           )}
@@ -115,11 +117,13 @@ function LeadRow({
   onSelectLead,
   selected,
   onSelectedChange,
+  onResearchLead,
 }: {
   lead: Lead
   onSelectLead: (lead: Lead) => void
   selected: boolean
   onSelectedChange: (checked: boolean) => void
+  onResearchLead?: (leadId: string) => void
 }) {
   const [isPending, startTransition] = useTransition()
   const [reviewsOpen, setReviewsOpen] = useState(false)
@@ -140,14 +144,7 @@ function LeadRow({
 
   function handleResearch(e: React.MouseEvent) {
     e.stopPropagation()
-    startTransition(async () => {
-      try {
-        await triggerResearchAction([lead.id])
-        toast.success(`Research started for "${lead.name}"`)
-      } catch {
-        toast.error('Failed to start research')
-      }
-    })
+    onResearchLead?.(lead.id)
   }
 
   return (
