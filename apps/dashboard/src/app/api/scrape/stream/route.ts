@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-export const maxDuration = 900 // 15 minutes — enterprise tier
+export const maxDuration = 300 // 5 minutes — max for hobby plan, auto-resumes on timeout
 
 import { requireAuth } from '@/lib/auth'
 

@@ -1,5 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SCRAPER_SERVICE_URL",
+    "SCRAPER_SECRET",
+    "ATTIO_API_KEY",
+    "ATTIO_LIST_ID",
+    "N8N_WEBHOOK_URL",
+    "OPENAI_API_KEY",
+    "RESEND_API_KEY",
+    "VERCEL_TOKEN",
+    "VERCEL_TEAM_ID"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
