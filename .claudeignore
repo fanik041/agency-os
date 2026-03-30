@@ -1,0 +1,13 @@
+# Ignore all node_modules in any subfolder
+**/node_modules/**
+**/.next/**
+**/.pnpm-store/**
+**/.turbo/**
+
+# Ignore Git and OS junk
+.git/
+.DS_Store
+
+# Ignore lockfiles (Claude doesn't need to read these)
+pnpm-lock.yaml
+package-lock.json

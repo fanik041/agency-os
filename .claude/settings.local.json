@@ -41,7 +41,22 @@
       "Bash(npx next:*)",
       "Bash(kill 43118 43119 && sleep 1 && lsof -i :3000 -i :3001 2>/dev/null | grep LISTEN || echo \"Ports 3000 and 3001 are free\")",
       "Bash(xargs kill:*)",
-      "Bash(lsof -ti:3000,3001 | xargs kill -9 2>/dev/null; echo \"Done\")"
+      "Bash(lsof -ti:3000,3001 | xargs kill -9 2>/dev/null; echo \"Done\")",
+      "Read(//Users/fahimanik/.claude/**)",
+      "Read(//Users/fahimanik/.claude/plugins/**)",
+      "Bash(claude --version)",
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Bash(test -f \"/Users/fahimanik/code/agency-os/apps/dashboard/src/app/$dir/actions.ts\")",
+      "Bash(done)",
+      "Bash(git log:*)",
+      "Bash(ls -1 /Users/fahimanik/code/agency-os/packages/db/src/repositories/*.ts)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(gh api:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "shadcn"
+  ]
 }
