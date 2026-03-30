@@ -55,7 +55,14 @@
       "Bash(gh api:*)",
       "Bash(find /Users/fahimanik/code/agency-os/apps/dashboard/src/app -name *leads* -o -name *lead*)",
       "Bash(grep -r \"XLSX\\\\|xlsx\\\\|\\\\.write\" /Users/fahimanik/code/agency-os/apps/dashboard/src --include=*.ts --include=*.tsx)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|json\\)$\")",
+      "Bash(grep -r \"N8N_WEBHOOK\\\\|OPENAI_API\\\\|ATTIO_API\" /Users/fahimanik/code/agency-os/.env*)",
+      "Bash(python3 -m json.tool)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -E \"\\\\.sql$\")",
+      "Bash(npm install:*)",
+      "Bash(pnpm add:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

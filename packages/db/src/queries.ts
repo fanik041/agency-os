@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './client'
-import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, LeadStatus, AttioSyncStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
+import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, AttioSyncStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
+import { LeadStatus } from './enums'
 
 // LEADS
 export async function getLeads(filters?: {
@@ -126,6 +127,43 @@ export async function updateLeadAttioSync(id: string, syncStatus: AttioSyncStatu
       attio_sync_status: syncStatus,
       attio_synced_at: new Date().toISOString(),
     })
+    .eq('id', id)
+    .select()
+    .single()
+}
+
+export async function getUnscoredLeads() {
+  return supabaseAdmin
+    .from('leads')
+    .select('*')
+    .eq('status', LeadStatus.New)
+    .is('pain_score', null)
+    .order('created_at', { ascending: true })
+}
+
+export async function updateLeadScoring(id: string, data: {
+  pain_score: number
+  pain_points: string
+  suggested_angle: string
+  message_draft: string
+  analyze: string
+  status: LeadStatus
+  has_booking: boolean
+  has_chat_widget: boolean
+  has_contact_form: boolean
+  page_load_ms: number | null
+  mobile_friendly: boolean
+  has_ssl: boolean
+  seo_issues: string | null
+  has_cta: boolean
+  phone_on_site: boolean
+  hours_on_site: boolean
+  has_social_proof: boolean
+  tech_stack: string | null
+}) {
+  return supabaseAdmin
+    .from('leads')
+    .update(data)
     .eq('id', id)
     .select()
     .single()

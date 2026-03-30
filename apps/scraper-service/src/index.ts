@@ -9,11 +9,14 @@ import {
   createLeadSource, updateLeadSourceCount,
   ScrapeJobStatus, LeadStatus, AttioSyncStatus, LeadSourceType,
   ResearchJobStatus, ContactSource,
+  getUnscoredLeads, updateLeadScoring, updateLeadStatus,
 } from '@agency-os/db'
 import { scrapeGoogleMaps, closeBrowser } from './scraper'
 import { enrichBusiness } from './enricher'
 import { searchDecisionMakers } from './researcher'
 import { analyzeWebsite, isValidUrl } from './analyzer'
+import { scoreLead } from './scorer'
+import { ScoringLogType } from './types/scoring'
 
 const app = express()
 app.use(express.json())
@@ -41,6 +44,7 @@ app.get('/', (_req, res) => res.json({
     'POST /scrape': 'Start a new scrape job — body: { niches: string[], location: string, maxPerNiche?: number, withEmails?: boolean }',
     'POST /scrape/stream': 'SSE stream — same body as POST /scrape, returns real-time events',
     'POST /research': 'Start decision-maker research — body: { leadIds: string[] }',
+    'POST /score/stream': 'SSE stream — score leads with AI, returns real-time events',
     'POST /analyze': 'Analyze a website for 13 signals — body: { url: string }',
   },
 }))
@@ -494,6 +498,200 @@ app.post('/research/stream', authMiddleware, async (req, res) => {
   if (!disconnected) res.end()
 })
 
+// ── POST /score/stream — SSE endpoint ─────────────────────────
+app.post('/score/stream', authMiddleware, async (req, res) => {
+  const { leadIds } = req.body
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  })
+
+  const send = (type: string, message: string, data?: unknown) => {
+    const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
+    res.write(`data: ${payload}\n\n`)
+  }
+
+  let disconnected = false
+  req.on('close', () => { disconnected = true })
+
+  const onLog = (type: string, message: string, data?: unknown) => {
+    if (!disconnected) send(type, message, data)
+  }
+
+  await runScoringJob(leadIds ?? null, onLog)
+
+  if (!disconnected) res.end()
+})
+
+async function runScoringJob(
+  leadIds: string[] | null,
+  onLog: (type: string, message: string, data?: unknown) => void,
+) {
+  let scored = 0
+  let skipped = 0
+  let failed = 0
+  let totalProducts = 0
+
+  const emit = (type: string, message: string, data?: unknown) => {
+    onLog(type, message, data)
+  }
+
+  try {
+    let leads: Awaited<ReturnType<typeof getUnscoredLeads>>['data']
+
+    if (leadIds && leadIds.length > 0) {
+      const results: NonNullable<typeof leads> = []
+      for (const id of leadIds) {
+        const { data } = await getLeadById(id)
+        if (data) results.push(data)
+      }
+      leads = results
+    } else {
+      const { data } = await getUnscoredLeads()
+      leads = data
+    }
+
+    if (!leads || leads.length === 0) {
+      emit(ScoringLogType.Done, 'No unscored leads found', { scored: 0, skipped: 0, failed: 0, totalProducts: 0 })
+      return
+    }
+
+    const total = leads.length
+    emit(ScoringLogType.Info, `Starting scoring for ${total} lead(s)...`)
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i]
+      const progress = `[${i + 1}/${total}]`
+
+      try {
+        if (lead.pain_score != null) {
+          emit(ScoringLogType.Warn, `${progress} Skipped "${lead.name}": already scored (${lead.pain_score}/9)`)
+          skipped++
+          continue
+        }
+
+        if (!lead.website) {
+          emit(ScoringLogType.Warn, `${progress} Skipped "${lead.name}": no website found`)
+          await updateLeadStatus(lead.id, LeadStatus.Skip)
+          skipped++
+          continue
+        }
+
+        emit(ScoringLogType.Info, `${progress} Analyzing website for "${lead.name}" (${lead.website})...`)
+        const signals = await analyzeWebsite(lead.website)
+
+        if (!signals.reachable) {
+          const url = lead.website.startsWith('http') ? lead.website : `https://${lead.website}`
+          let reason = 'website unreachable'
+          try {
+            const resp = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) }).catch(() => null)
+            if (resp) {
+              if (resp.status === 403 || resp.status === 401) {
+                reason = `website blocked access (HTTP ${resp.status})`
+              } else if (resp.status === 404) {
+                reason = `website not found (HTTP ${resp.status})`
+              } else if (resp.status >= 500) {
+                reason = `website server error (HTTP ${resp.status})`
+              } else {
+                reason = `website returned HTTP ${resp.status}`
+              }
+            } else {
+              reason = 'website timed out or unreachable'
+            }
+          } catch {
+            reason = 'website timed out or unreachable'
+          }
+
+          emit(ScoringLogType.Warn, `${progress} Skipped "${lead.name}": ${reason} (${lead.website})`)
+          await updateLeadStatus(lead.id, LeadStatus.Skip)
+          skipped++
+          continue
+        }
+
+        emit(ScoringLogType.Info, `${progress} Website analyzed. Scoring with AI...`)
+
+        const scoreResult = await scoreLead({
+          name: lead.name,
+          niche: lead.niche,
+          city: lead.city,
+          website: lead.website,
+          rating: lead.rating,
+          review_count: lead.review_count,
+          signals,
+        })
+
+        let newStatus: typeof LeadStatus.NeedsReview | typeof LeadStatus.Scoring | typeof LeadStatus.Skip
+        if (scoreResult.pain_score >= 6) {
+          newStatus = LeadStatus.NeedsReview
+        } else if (scoreResult.pain_score >= 4) {
+          newStatus = LeadStatus.Scoring
+        } else {
+          newStatus = LeadStatus.Skip
+        }
+
+        const analyzeJson = JSON.stringify({
+          signals,
+          scoring: {
+            pain_score: scoreResult.pain_score,
+            pain_points: scoreResult.pain_points,
+            revenue_leaks: scoreResult.revenue_leaks,
+            recommended_products: scoreResult.recommended_products,
+            suggested_angle: scoreResult.suggested_angle,
+            message_draft: scoreResult.message_draft,
+          },
+        })
+
+        await updateLeadScoring(lead.id, {
+          pain_score: scoreResult.pain_score,
+          pain_points: scoreResult.pain_points,
+          suggested_angle: scoreResult.suggested_angle,
+          message_draft: scoreResult.message_draft,
+          analyze: analyzeJson,
+          status: newStatus,
+          has_booking: signals.has_booking,
+          has_chat_widget: signals.has_chat_widget,
+          has_contact_form: signals.has_contact_form,
+          page_load_ms: signals.page_load_ms,
+          mobile_friendly: signals.mobile_friendly,
+          has_ssl: signals.has_ssl,
+          seo_issues: signals.seo_issues,
+          has_cta: signals.has_cta,
+          phone_on_site: signals.phone_on_site,
+          hours_on_site: signals.hours_on_site,
+          has_social_proof: signals.has_social_proof,
+          tech_stack: signals.tech_stack,
+        })
+
+        totalProducts += scoreResult.recommended_products.length
+        scored++
+
+        emit(ScoringLogType.Scored, `${progress} "${lead.name}" — Score: ${scoreResult.pain_score}/9 | ${scoreResult.recommended_products.length} products | Status: ${newStatus}`, {
+          name: lead.name,
+          pain_score: scoreResult.pain_score,
+          suggested_angle: scoreResult.suggested_angle,
+          products: scoreResult.recommended_products.length,
+        })
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        emit(ScoringLogType.Error, `${progress} Failed "${lead.name}": ${errMsg}`)
+        failed++
+      }
+    }
+
+    emit(ScoringLogType.Done, `Scoring complete — ${scored} scored, ${skipped} skipped, ${failed} failed, ${totalProducts} products recommended`, {
+      scored,
+      skipped,
+      failed,
+      totalProducts,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    emit(ScoringLogType.Error, `Fatal error: ${message}`)
+  }
+}
+
 async function runResearchJob(
   jobId: string,
   leadIds: string[],
@@ -617,7 +815,7 @@ app.post('/analyze', authMiddleware, async (req, res) => {
 const PORT = process.env.PORT || 3001
 
 // Validate env on startup
-const required = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
+const required = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY']
 for (const key of required) {
   if (!process.env[key]) {
     console.error(`Missing required env var: ${key}`)
