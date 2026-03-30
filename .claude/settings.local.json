@@ -52,7 +52,9 @@
       "Bash(git log:*)",
       "Bash(ls -1 /Users/fahimanik/code/agency-os/packages/db/src/repositories/*.ts)",
       "Bash(xargs -I {} basename {})",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(find /Users/fahimanik/code/agency-os/apps/dashboard/src/app -name *leads* -o -name *lead*)",
+      "Bash(grep -r \"XLSX\\\\|xlsx\\\\|\\\\.write\" /Users/fahimanik/code/agency-os/apps/dashboard/src --include=*.ts --include=*.tsx)"
     ]
   },
   "enableAllProjectMcpServers": true,
