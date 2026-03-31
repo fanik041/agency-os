@@ -71,12 +71,12 @@ export function CallLoggerSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[480px]">
+      <SheetContent className="w-[500px] sm:w-[600px] lg:w-[700px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{lead.name}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-4 pb-8">
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Website</span>
@@ -94,7 +94,7 @@ export function CallLoggerSheet({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Address</span>
-              <span className="font-medium text-xs max-w-[200px] text-right">{lead.address ?? 'N/A'}</span>
+              <span className="font-medium text-xs max-w-[360px] text-right">{lead.address ?? 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Rating</span>
@@ -122,19 +122,19 @@ export function CallLoggerSheet({
             {lead.pain_points && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Pain Points</span>
-                <span className="max-w-[200px] text-right text-xs">{lead.pain_points}</span>
+                <span className="max-w-[360px] text-right text-xs leading-relaxed">{lead.pain_points}</span>
               </div>
             )}
             {lead.suggested_angle && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Suggested Angle</span>
-                <span className="max-w-[200px] text-right text-xs">{lead.suggested_angle}</span>
+                <span className="max-w-[360px] text-right text-xs leading-relaxed">{lead.suggested_angle}</span>
               </div>
             )}
             {lead.message_draft && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Message Draft</span>
-                <span className="max-w-[200px] text-right text-xs">{lead.message_draft}</span>
+                <span className="max-w-[360px] text-right text-xs leading-relaxed">{lead.message_draft}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -156,7 +156,7 @@ export function CallLoggerSheet({
             {lead.notes && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Notes</span>
-                <span className="max-w-[200px] text-right text-xs">{lead.notes}</span>
+                <span className="max-w-[360px] text-right text-xs leading-relaxed">{lead.notes}</span>
               </div>
             )}
             <div className="flex justify-between">

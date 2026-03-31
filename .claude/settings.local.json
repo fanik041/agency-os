@@ -62,7 +62,8 @@
       "Bash(xargs ls:*)",
       "Bash(grep -E \"\\\\.sql$\")",
       "Bash(npm install:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(/Users/fahimanik/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh --project-dir /Users/fahimanik/code/agency-os 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,
