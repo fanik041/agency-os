@@ -40,8 +40,8 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b bg-sidebar-background px-4 md:hidden">
-        <span className="text-lg font-semibold tracking-tight">Agency OS</span>
+      <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b border-[#dadde1] bg-white px-4 md:hidden">
+        <span className="text-lg font-semibold tracking-tight text-[#1c1e21]">Agency OS</span>
         <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1">
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -49,7 +49,7 @@ export function Sidebar() {
 
       {/* Mobile dropdown nav */}
       {mobileOpen && (
-        <nav className="fixed top-14 left-0 right-0 z-40 border-b bg-sidebar-background p-2 md:hidden">
+        <nav className="fixed top-14 left-0 right-0 z-40 border-b border-[#dadde1] bg-white p-2 md:hidden">
           {navItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
             return (
@@ -81,9 +81,9 @@ export function Sidebar() {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden h-screen w-56 flex-col border-r bg-sidebar-background md:flex">
-        <div className="flex h-14 items-center border-b px-4">
-          <span className="text-lg font-semibold tracking-tight">Agency OS</span>
+      <aside className="hidden h-screen w-56 flex-col border-r border-[#dadde1] bg-white md:flex">
+        <div className="flex h-14 items-center border-b border-[#dadde1] px-4">
+          <span className="text-lg font-semibold tracking-tight text-[#1c1e21]">Agency OS</span>
         </div>
         <nav className="flex-1 space-y-1 p-2">
           {navItems.map((item) => {
@@ -93,10 +93,10 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    ? 'bg-[#e7f3ff] text-[#1877f2]'
+                    : 'text-[#65676b] hover:bg-[#f0f2f5] hover:text-[#1c1e21]'
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -105,11 +105,11 @@ export function Sidebar() {
             )
           })}
         </nav>
-        <div className="border-t p-2">
+        <div className="border-t border-[#dadde1] p-2">
           <button
             onClick={handleLogout}
             disabled={isPending}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50 disabled:opacity-50"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#65676b] transition-colors hover:bg-[#f0f2f5] hover:text-[#1c1e21] disabled:opacity-50"
           >
             <LogOut className="h-4 w-4" />
             {isPending ? 'Signing out…' : 'Sign out'}

@@ -41,12 +41,12 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((m) => (
-          <Card key={m.label}>
+          <Card key={m.label} className="border-[#dadde1] shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-medium text-[#65676b]">
                 {m.label}
               </CardTitle>
-              <m.icon className="h-4 w-4 text-muted-foreground" />
+              <m.icon className="h-4 w-4 text-[#65676b]" />
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{m.value}</p>

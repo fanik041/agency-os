@@ -41,7 +41,7 @@ export default async function LeadsPage({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Leads</h1>
+        <h1 className="text-2xl font-bold text-[#1c1e21]">Leads</h1>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{totalCount} leads</span>
           <AdvancedSearchDialog sources={filterOptions.sources} scrapeJobs={scrapeJobs} />

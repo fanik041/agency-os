@@ -1,15 +1,15 @@
 import type { LeadStatus, CallOutcome, SiteStatus, ScrapeJobStatus } from '@agency-os/db'
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
-  new: 'bg-gray-100 text-gray-700',
-  scoring: 'bg-blue-100 text-blue-700',
-  needs_review: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-purple-100 text-purple-700',
-  sent: 'bg-indigo-100 text-indigo-700',
-  replied: 'bg-teal-100 text-teal-700',
-  booked: 'bg-green-100 text-green-700',
-  closed: 'bg-green-200 text-green-800',
-  skip: 'bg-red-100 text-red-700',
+  new: 'bg-[#e7f3ff] text-[#1877f2] rounded-full px-2.5',
+  scoring: 'bg-[#e7f3ff] text-[#1264c8] rounded-full px-2.5',
+  needs_review: 'bg-[#fff3cd] text-[#856404] rounded-full px-2.5',
+  approved: 'bg-[#d4edda] text-[#155724] rounded-full px-2.5',
+  sent: 'bg-[#cce5ff] text-[#004085] rounded-full px-2.5',
+  replied: 'bg-[#d4edda] text-[#16a34a] rounded-full px-2.5',
+  booked: 'bg-[#cce5ff] text-[#004085] rounded-full px-2.5 font-semibold',
+  closed: 'bg-[#f0f2f5] text-[#65676b] rounded-full px-2.5',
+  skip: 'bg-[#f0f2f5] text-[#8a8d91] rounded-full px-2.5',
 }
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
@@ -34,14 +34,14 @@ export const OUTCOME_LABELS: Record<CallOutcome, string> = {
 }
 
 export const SITE_STATUS_COLORS: Record<SiteStatus, string> = {
-  building: 'bg-yellow-100 text-yellow-700',
-  live: 'bg-green-100 text-green-700',
-  paused: 'bg-gray-100 text-gray-700',
+  building: 'bg-[#fff3cd] text-[#856404] rounded-full px-2.5',
+  live: 'bg-[#d4edda] text-[#155724] rounded-full px-2.5',
+  paused: 'bg-[#f0f2f5] text-[#65676b] rounded-full px-2.5',
 }
 
 export const JOB_STATUS_COLORS: Record<ScrapeJobStatus, string> = {
-  queued: 'bg-gray-100 text-gray-700',
-  running: 'bg-blue-100 text-blue-700',
-  done: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
+  queued: 'bg-[#f0f2f5] text-[#65676b] rounded-full px-2.5',
+  running: 'bg-[#e7f3ff] text-[#1877f2] rounded-full px-2.5',
+  done: 'bg-[#d4edda] text-[#155724] rounded-full px-2.5',
+  failed: 'bg-[#f8d7da] text-[#721c24] rounded-full px-2.5',
 }

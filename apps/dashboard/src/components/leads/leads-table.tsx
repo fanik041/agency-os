@@ -62,10 +62,10 @@ export function LeadsTable({
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg border border-[#dadde1] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
       <Table className="table-fixed">
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-[#f0f2f5] hover:bg-[#f0f2f5]">
             <TableHead className="w-10">
               <Checkbox
                 checked={allSelected}
@@ -150,7 +150,7 @@ function LeadRow({
   return (
     <>
       <TableRow
-        className="cursor-pointer hover:bg-muted/50"
+        className="cursor-pointer hover:bg-[#f7f8fa] border-[#e4e6eb]"
         onClick={() => onSelectLead(lead)}
       >
         <TableCell onClick={(e) => e.stopPropagation()}>

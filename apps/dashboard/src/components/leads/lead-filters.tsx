@@ -57,12 +57,12 @@ export function LeadFilters({
   return (
     <div className="flex flex-wrap gap-2">
       <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#65676b]" />
         <Input
           placeholder="Search leads..."
           value={searchValue}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-52 pl-8"
+          className="w-52 pl-9 rounded-full bg-[#f0f2f5] border-transparent focus:border-[#1877f2] focus:bg-white"
         />
       </div>
 

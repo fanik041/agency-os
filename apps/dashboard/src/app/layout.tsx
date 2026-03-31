@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           ) : (
             <div className="flex h-screen">
               <Sidebar />
-              <main className="flex-1 overflow-auto pt-14 p-4 md:pt-6 md:p-6">{children}</main>
+              <main className="flex-1 overflow-auto pt-14 p-4 md:pt-6 md:p-6 bg-[#f0f2f5]">{children}</main>
               <Toaster />
             </div>
           )}
