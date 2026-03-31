@@ -65,7 +65,12 @@
       "Bash(pnpm add:*)",
       "Bash(/Users/fahimanik/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh --project-dir /Users/fahimanik/code/agency-os 2>&1)",
       "Bash(lsof -ti:54143)",
-      "Bash(find /Users/fahimanik/code/agency-os/apps/dashboard/src/app/api -type f -name *.ts)"
+      "Bash(find /Users/fahimanik/code/agency-os/apps/dashboard/src/app/api -type f -name *.ts)",
+      "Bash(grep -r ATTIO_LIST_ID /Users/fahimanik/code/agency-os --include=*.ts --include=*.tsx --include=*.js)",
+      "Bash(grep -r ATTIO_API_KEY /Users/fahimanik/code/agency-os --include=*.ts --include=*.tsx --include=*.js --include=.env*)",
+      "Bash(node -e \":*)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(npx tsx:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

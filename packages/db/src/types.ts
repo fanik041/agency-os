@@ -8,6 +8,8 @@ import type {
   ContactSource,
   LeadSourceType,
   ResearchJobStatus,
+  SubscriptionStatus,
+  UsageAction,
 } from './enums'
 
 export type {
@@ -20,6 +22,8 @@ export type {
   ContactSource,
   LeadSourceType,
   ResearchJobStatus,
+  SubscriptionStatus,
+  UsageAction,
 } from './enums'
 
 /** @deprecated Use LeadStatus instead */
@@ -164,6 +168,47 @@ export interface Profile {
   email: string
   full_name: string | null
   avatar_url: string | null
+  is_admin: boolean
+  created_at: string
+}
+
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  base_price_cents: number
+  max_leads: number | null
+  max_scores_per_month: number | null
+  max_scores_lifetime: number | null
+  max_scrapes_per_month: number | null
+  max_scrapes_lifetime: number | null
+  max_scrape_leads_lifetime: number | null
+  attio_sync_enabled: boolean
+  cost_per_score_cents: number
+  cost_per_scrape_cents: number
+  cost_per_scrape_large_cents: number
+  cost_per_lead_overage_cents: number
+  cost_per_attio_sync_cents: number
+  created_at: string
+}
+
+export interface UserSubscription {
+  id: string
+  user_id: string
+  plan_id: string
+  status: SubscriptionStatus
+  started_at: string
+  expires_at: string | null
+  created_at: string
+}
+
+export interface UsageRecord {
+  id: string
+  user_id: string
+  action: UsageAction
+  quantity: number
+  cost_cents: number
+  period: string
+  metadata: Record<string, unknown> | null
   created_at: string
 }
 
@@ -214,6 +259,21 @@ export interface Database {
         Row: Profile
         Insert: Omit<Profile, 'created_at'>
         Update: Partial<Omit<Profile, 'id' | 'created_at'>>
+      }
+      subscription_plans: {
+        Row: SubscriptionPlan
+        Insert: Omit<SubscriptionPlan, 'created_at'>
+        Update: Partial<Omit<SubscriptionPlan, 'id' | 'created_at'>>
+      }
+      user_subscriptions: {
+        Row: UserSubscription
+        Insert: Omit<UserSubscription, 'id' | 'created_at'>
+        Update: Partial<Omit<UserSubscription, 'id' | 'created_at'>>
+      }
+      usage_records: {
+        Row: UsageRecord
+        Insert: Omit<UsageRecord, 'id' | 'created_at'>
+        Update: Partial<Omit<UsageRecord, 'id' | 'created_at'>>
       }
     }
   }

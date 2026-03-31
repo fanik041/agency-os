@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { compareAttioAction, updateSingleAttioEntryAction, createNewAttioEntryAction } from '@/app/leads/actions'
+import { compareAttioAction, updateSingleAttioEntryAction, createNewAttioEntryAction, checkAttioSyncLimitAction } from '@/app/leads/actions'
 
 type LogType = 'info' | 'success' | 'error' | 'warn' | 'done' | 'detail'
 
@@ -37,6 +37,17 @@ export function SyncAttioButton() {
     setLogs([])
     setStats(null)
     setOpen(true)
+
+    // Check tier limits
+    const limitResult = await checkAttioSyncLimitAction()
+    if (!limitResult.allowed) {
+      addLog(limitResult.reason ?? 'Attio sync not available on your plan', 'error')
+      setLoading(false)
+      return
+    }
+    if (limitResult.cost_cents && limitResult.cost_cents > 0) {
+      addLog(`Cost: $${(limitResult.cost_cents / 100).toFixed(2)} per sync (Per Use plan)`)
+    }
 
     addLog('Step 1: Fetching leads from Supabase and entries from Attio...')
 

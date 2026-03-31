@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { checkScoringLimitAction } from '@/app/leads/actions'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,7 +32,7 @@ interface ScoringStats {
 
 const MAX_RETRIES = 5
 
-export function ScoreLeadsButton() {
+export function ScoreLeadsButton({ leadIds }: { leadIds?: string[] } = {}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -55,12 +56,12 @@ export function ScoreLeadsButton() {
       const resp = await fetch('/api/score/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(leadIds?.length ? { leadIds } : {}),
       })
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: 'Request failed' }))
-        addLog(`Error: ${err.error || resp.statusText}`, 'error')
+        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status} ${resp.statusText}` }))
+        addLog(`Error (${resp.status}): ${err.error}`, 'error')
         return false
       }
 
@@ -126,6 +127,18 @@ export function ScoreLeadsButton() {
     setLogs([])
     setStats(null)
     setOpen(true)
+
+    // Check tier limits
+    const limitResult = await checkScoringLimitAction()
+    if (!limitResult.allowed) {
+      addLog(`Blocked: ${limitResult.reason}`, 'error')
+      setLoading(false)
+      startedRef.current = false
+      return
+    }
+    if (limitResult.cost_cents && limitResult.cost_cents > 0) {
+      addLog(`Cost: $${(limitResult.cost_cents / 100).toFixed(2)} per lead scored (Per Use plan)`)
+    }
 
     addLog('Connecting to scoring pipeline...')
 

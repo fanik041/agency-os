@@ -413,3 +413,92 @@ export async function deleteProfile(id: string) {
     .delete()
     .eq('id', id)
 }
+
+// SUBSCRIPTIONS
+
+export async function getSubscriptionPlan(planId: string) {
+  return supabaseAdmin
+    .from('subscription_plans')
+    .select('*')
+    .eq('id', planId)
+    .single()
+}
+
+export async function getAllSubscriptionPlans() {
+  return supabaseAdmin
+    .from('subscription_plans')
+    .select('*')
+    .order('base_price_cents', { ascending: true })
+}
+
+export async function getUserSubscription(userId: string) {
+  return supabaseAdmin
+    .from('user_subscriptions')
+    .select('*, subscription_plans(*)')
+    .eq('user_id', userId)
+    .maybeSingle()
+}
+
+export async function createUserSubscription(userId: string, planId: string) {
+  return supabaseAdmin
+    .from('user_subscriptions')
+    .insert({
+      user_id: userId,
+      plan_id: planId,
+      status: 'active' as const,
+      started_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
+}
+
+export async function updateUserSubscriptionPlan(userId: string, planId: string) {
+  return supabaseAdmin
+    .from('user_subscriptions')
+    .update({ plan_id: planId })
+    .eq('user_id', userId)
+    .select()
+    .single()
+}
+
+// USAGE TRACKING
+
+export async function getUsageForPeriod(userId: string, period: string) {
+  return supabaseAdmin
+    .from('usage_records')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('period', period)
+}
+
+export async function getUsageCountByAction(userId: string, action: string, period: string) {
+  return supabaseAdmin
+    .from('usage_records')
+    .select('quantity')
+    .eq('user_id', userId)
+    .eq('action', action)
+    .eq('period', period)
+}
+
+export async function getLifetimeUsageCount(userId: string, action: string) {
+  return supabaseAdmin
+    .from('usage_records')
+    .select('quantity')
+    .eq('user_id', userId)
+    .eq('action', action)
+}
+
+export async function insertUsageRecord(record: {
+  user_id: string
+  action: string
+  quantity: number
+  cost_cents: number
+  period: string
+  metadata?: Record<string, unknown> | null
+}) {
+  return supabaseAdmin
+    .from('usage_records')
+    .insert(record)
+    .select()
+    .single()
+}

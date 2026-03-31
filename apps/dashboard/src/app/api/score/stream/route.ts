@@ -18,19 +18,27 @@ export async function POST(req: Request) {
     headers['Authorization'] = `Bearer ${process.env.SCRAPER_SECRET}`
   }
 
-  const upstream = await fetch(`${scraperUrl}/score/stream`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  })
+  let upstream: Response
+  try {
+    upstream = await fetch(`${scraperUrl}/score/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`[score/stream] Failed to connect to scraper service at ${scraperUrl}: ${message}`)
+    return Response.json({ error: `Scraper service unreachable (${scraperUrl}): ${message}` }, { status: 502 })
+  }
 
   if (!upstream.ok) {
-    const text = await upstream.text()
-    return Response.json({ error: text }, { status: upstream.status })
+    const text = await upstream.text().catch(() => `HTTP ${upstream.status}`)
+    console.error(`[score/stream] Scraper returned ${upstream.status}: ${text}`)
+    return Response.json({ error: `Scraper error (HTTP ${upstream.status}): ${text}` }, { status: upstream.status })
   }
 
   if (!upstream.body) {
-    return Response.json({ error: 'No stream body' }, { status: 500 })
+    return Response.json({ error: 'No stream body returned from scraper service' }, { status: 500 })
   }
 
   return new Response(upstream.body, {

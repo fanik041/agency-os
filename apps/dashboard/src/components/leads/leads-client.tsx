@@ -10,6 +10,8 @@ import { CallLoggerSheet } from './call-logger-sheet'
 import { LeadFilters } from './lead-filters'
 import { PaginationControls } from './pagination-controls'
 import { ResearchLogModal } from './research-log-modal'
+import { ScoreLeadsButton } from './score-leads-button'
+import { SyncAttioButton } from './update-attio-button'
 import { toast } from 'sonner'
 import { UserSearch, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -51,8 +53,17 @@ export function LeadsClient({
     setSelectedIds(new Set())
   }
 
+  // Get the active dataset — selected rows if any, otherwise all visible leads
+  function getActiveLeads(): Lead[] {
+    if (selectedIds.size > 0) {
+      return leads.filter((lead) => selectedIds.has(lead.id))
+    }
+    return leads
+  }
+
   function handleExportXlsx() {
-    const data = leads.map((lead) => ({
+    const activeLeads = getActiveLeads()
+    const data = activeLeads.map((lead) => ({
       Name: lead.name ?? '',
       Phone: lead.phone ?? '',
       Email: lead.email_found ?? '',
@@ -76,7 +87,8 @@ export function LeadsClient({
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Leads')
     XLSX.writeFile(wb, `leads-export-${new Date().toISOString().slice(0, 10)}.xlsx`)
-    toast.success(`Exported ${leads.length} leads to XLSX`)
+    const label = selectedIds.size > 0 ? `${activeLeads.length} selected leads` : `${activeLeads.length} leads`
+    toast.success(`Exported ${label} to XLSX`)
   }
 
   return (
@@ -86,8 +98,10 @@ export function LeadsClient({
         <div className="flex items-center gap-2">
           <Button onClick={handleExportXlsx} variant="outline" size="sm">
             <Download className="mr-2 h-4 w-4" />
-            Export XLSX
+            {selectedIds.size > 0 ? `Export Selected (${selectedIds.size})` : 'Export XLSX'}
           </Button>
+          <ScoreLeadsButton leadIds={selectedIds.size > 0 ? Array.from(selectedIds) : undefined} />
+          <SyncAttioButton />
           {selectedIds.size > 0 && (
             <Button onClick={handleResearchSelected} size="sm">
               <UserSearch className="mr-2 h-4 w-4" />

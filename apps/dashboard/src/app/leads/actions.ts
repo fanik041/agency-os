@@ -185,3 +185,17 @@ export async function importLeadsAction(leads: ParsedLead[], fileName?: string) 
   revalidatePath('/leads')
   return result
 }
+
+export async function checkScoringLimitAction() {
+  const user = await requireAuth()
+  const { checkLimit } = await import('@/lib/limits')
+  const { UsageAction } = await import('@agency-os/db')
+  return checkLimit(user.id, UsageAction.Score)
+}
+
+export async function checkAttioSyncLimitAction() {
+  const user = await requireAuth()
+  const { checkLimit } = await import('@/lib/limits')
+  const { UsageAction } = await import('@agency-os/db')
+  return checkLimit(user.id, UsageAction.AttioSync)
+}

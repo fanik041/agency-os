@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { upsertProfile, getProfileById } from '@agency-os/db'
+import { upsertProfile, getProfileById, createUserSubscription } from '@agency-os/db'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
@@ -62,6 +62,9 @@ export async function GET(request: NextRequest) {
       full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
       avatar_url: user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null,
     })
+
+    // Create free subscription for new user
+    await createUserSubscription(user.id, 'free')
   } else {
     const fullName = user.user_metadata?.full_name ?? user.user_metadata?.name
     const avatarUrl = user.user_metadata?.avatar_url ?? user.user_metadata?.picture

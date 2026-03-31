@@ -64,3 +64,24 @@ export enum ResearchJobStatus {
   Done = 'done',
   Failed = 'failed',
 }
+
+export enum SubscriptionStatus {
+  Active = 'active',
+  Cancelled = 'cancelled',
+  PastDue = 'past_due',
+}
+
+export enum UsageAction {
+  Score = 'score',
+  Scrape = 'scrape',
+  ScrapeLarge = 'scrape_large',
+  AttioSync = 'attio_sync',
+  LeadOverage = 'lead_overage',
+}
+
+export enum PlanId {
+  Free = 'free',
+  PerUse = 'per_use',
+  Pro = 'pro',
+  Enterprise = 'enterprise',
+}
