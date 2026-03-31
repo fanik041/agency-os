@@ -37,7 +37,6 @@ export async function POST(req: Request) {
   console.log(`[score] Calling ${scraperUrl}/score/stream`)
 
   try {
-    // Call scraper and collect the full SSE response
     const upstream = await fetch(`${scraperUrl}/score/stream`, {
       method: 'POST',
       headers,

@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 import { requireAuth } from '@/lib/auth'
-import http from 'node:http'
 
 export async function POST(req: Request) {
   await requireAuth()
@@ -14,64 +13,46 @@ export async function POST(req: Request) {
 
   const body = await req.json()
 
-  const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (process.env.SCRAPER_SECRET) {
-    reqHeaders['Authorization'] = `Bearer ${process.env.SCRAPER_SECRET}`
+    headers['Authorization'] = `Bearer ${process.env.SCRAPER_SECRET}`
   }
 
-  const target = new URL('/research/stream', scraperUrl)
-
-  const upstream = await new Promise<http.IncomingMessage>((resolve, reject) => {
-    const postData = JSON.stringify(body)
-    const httpReq = http.request(
-      {
-        hostname: target.hostname,
-        port: target.port,
-        path: target.pathname,
-        method: 'POST',
-        headers: { ...reqHeaders, 'Content-Length': Buffer.byteLength(postData) },
-        timeout: 600_000,
-      },
-      (res) => resolve(res),
-    )
-    httpReq.on('error', reject)
-    httpReq.on('timeout', () => httpReq.destroy(new Error('Connection timeout')))
-    httpReq.write(postData)
-    httpReq.end()
+  const upstream = await fetch(`${scraperUrl}/research/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
   })
 
-  if (!upstream.statusCode || upstream.statusCode >= 400) {
-    const chunks: Buffer[] = []
-    for await (const chunk of upstream) chunks.push(chunk as Buffer)
-    const text = Buffer.concat(chunks).toString()
-    return Response.json({ error: text }, { status: upstream.statusCode || 500 })
+  if (!upstream.ok) {
+    const text = await upstream.text()
+    return Response.json({ error: text }, { status: upstream.status })
   }
 
-  const { readable, writable } = new TransformStream()
-  const writer = writable.getWriter()
-  const encoder = new TextEncoder()
+  const upstreamReader = upstream.body?.getReader()
+  if (!upstreamReader) {
+    return Response.json({ error: 'No stream body' }, { status: 500 })
+  }
 
-  ;(async () => {
-    try {
-      upstream.on('data', async (chunk: Buffer) => {
-        try { await writer.write(encoder.encode(chunk.toString())) } catch { upstream.destroy() }
-      })
-      upstream.on('end', async () => {
-        try { await writer.close() } catch { /* already closed */ }
-      })
-      upstream.on('error', async () => {
-        try { await writer.close() } catch { /* already closed */ }
-      })
-    } catch {
-      try { await writer.close() } catch { /* already closed */ }
-    }
-  })()
+  const stream = new ReadableStream({
+    async pull(controller) {
+      try {
+        const { done, value } = await upstreamReader.read()
+        if (done) { controller.close(); return }
+        controller.enqueue(value)
+      } catch {
+        controller.close()
+      }
+    },
+    cancel() {
+      upstreamReader.cancel().catch(() => {})
+    },
+  })
 
-  return new Response(readable, {
+  return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })
