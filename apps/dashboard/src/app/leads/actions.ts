@@ -123,50 +123,6 @@ export async function createNewAttioEntryAction(entry: {
   return container.attioSyncService.createEntry(entry)
 }
 
-export async function scoreLeadsAction() {
-  await requireAuth()
-  unstable_noStore()
-
-  const webhookUrl = process.env.N8N_WEBHOOK_URL
-  if (!webhookUrl) throw new Error('N8N_WEBHOOK_URL not configured')
-
-  const leads = await container.leadRepo.getAll()
-  const unscored = leads.filter(l => l.status === 'new' && l.pain_score == null)
-
-  if (unscored.length === 0) {
-    return { ok: true as const, sent: 0, failed: 0, total: 0, errors: [] as string[] }
-  }
-
-  let sent = 0
-  let failed = 0
-  const errors: string[] = []
-
-  for (const lead of unscored) {
-    try {
-      const resp = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lead_id: lead.id,
-          name: lead.name,
-          website: lead.website,
-        }),
-      })
-      if (!resp.ok) {
-        errors.push(`${lead.name}: HTTP ${resp.status}`)
-        failed++
-      } else {
-        sent++
-      }
-    } catch (err) {
-      errors.push(`${lead.name}: ${err instanceof Error ? err.message : String(err)}`)
-      failed++
-    }
-  }
-
-  revalidatePath('/leads')
-  return { ok: true as const, sent, failed, total: unscored.length, errors }
-}
 
 interface ParsedLead {
   name: string

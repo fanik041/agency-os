@@ -299,6 +299,7 @@ app.post('/scrape/stream', async (req, res) => {
   const send = (type: string, message: string, data?: any) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
     res.write(`data: ${payload}\n\n`)
+    if (typeof (res as any).flush === 'function') (res as any).flush()
   }
 
   // Handle client disconnect
@@ -488,6 +489,7 @@ app.post('/research/stream', authMiddleware, async (req, res) => {
   const send = (type: string, message: string, data?: any) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
     res.write(`data: ${payload}\n\n`)
+    if (typeof (res as any).flush === 'function') (res as any).flush()
   }
 
   let disconnected = false
@@ -513,10 +515,14 @@ app.post('/score/stream', authMiddleware, async (req, res) => {
     'X-Accel-Buffering': 'no',
   })
   res.flushHeaders()
+  // Send initial comment to confirm stream is open
+  res.write(':ok\n\n')
+  if (typeof (res as any).flush === 'function') (res as any).flush()
 
   const send = (type: string, message: string, data?: unknown) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
     res.write(`data: ${payload}\n\n`)
+    if (typeof (res as any).flush === 'function') (res as any).flush()
   }
 
   let disconnected = false

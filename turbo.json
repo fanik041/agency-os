@@ -8,7 +8,6 @@
     "SCRAPER_SECRET",
     "ATTIO_API_KEY",
     "ATTIO_LIST_ID",
-    "N8N_WEBHOOK_URL",
     "OPENAI_API_KEY",
     "RESEND_API_KEY",
     "VERCEL_TOKEN",
