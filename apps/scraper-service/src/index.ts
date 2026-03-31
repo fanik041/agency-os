@@ -292,7 +292,9 @@ app.post('/scrape/stream', async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   })
+  res.flushHeaders()
 
   const send = (type: string, message: string, data?: any) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
@@ -479,7 +481,9 @@ app.post('/research/stream', authMiddleware, async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   })
+  res.flushHeaders()
 
   const send = (type: string, message: string, data?: any) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
@@ -506,7 +510,9 @@ app.post('/score/stream', authMiddleware, async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   })
+  res.flushHeaders()
 
   const send = (type: string, message: string, data?: unknown) => {
     const payload = JSON.stringify({ type, message, ...(data !== undefined ? { data } : {}) })
