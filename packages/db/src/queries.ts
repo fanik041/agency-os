@@ -132,6 +132,14 @@ export async function updateLeadAttioSync(id: string, syncStatus: AttioSyncStatu
     .single()
 }
 
+export async function resetUnscoredLeadsToNew() {
+  return supabaseAdmin
+    .from('leads')
+    .update({ status: LeadStatus.New })
+    .is('pain_score', null)
+    .neq('status', LeadStatus.New)
+}
+
 export async function getUnscoredLeads() {
   return supabaseAdmin
     .from('leads')

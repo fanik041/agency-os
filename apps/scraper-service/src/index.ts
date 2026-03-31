@@ -9,7 +9,7 @@ import {
   createLeadSource, updateLeadSourceCount,
   ScrapeJobStatus, LeadStatus, AttioSyncStatus, LeadSourceType,
   ResearchJobStatus, ContactSource,
-  getUnscoredLeads, updateLeadScoring, updateLeadStatus,
+  getUnscoredLeads, resetUnscoredLeadsToNew, updateLeadScoring, updateLeadStatus,
 } from '@agency-os/db'
 import { scrapeGoogleMaps, closeBrowser } from './scraper'
 import { enrichBusiness } from './enricher'
@@ -551,6 +551,12 @@ async function runScoringJob(
   }
 
   try {
+    // Reset any leads with null pain_score back to 'new' so they get picked up
+    const { count: resetCount } = await resetUnscoredLeadsToNew()
+    if (resetCount && resetCount > 0) {
+      emit(ScoringLogType.Info, `Reset ${resetCount} unscored lead(s) to "new" status`)
+    }
+
     let leads: Awaited<ReturnType<typeof getUnscoredLeads>>['data']
 
     if (leadIds && leadIds.length > 0) {
