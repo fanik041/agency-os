@@ -17,36 +17,24 @@ export async function loginWithEmail(formData: FormData) {
   redirect('/')
 }
 
-async function resolveSiteUrl(): Promise<string> {
-  const localhostUrl = 'http://localhost:3000'
+function resolveSiteUrl(): string {
   const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
+  const nodeEnv = process.env.NODE_ENV
 
-  // Try localhost first (local dev)
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 1000)
-    const resp = await fetch(localhostUrl, {
-      method: 'HEAD',
-      signal: controller.signal,
-    })
-    clearTimeout(timeout)
-    if (resp.ok || resp.status < 500) {
-      console.log(`[OAuth] Using localhost: ${localhostUrl}`)
-      return localhostUrl
+  // In production (Vercel), always use NEXT_PUBLIC_SITE_URL
+  if (nodeEnv === 'production') {
+    if (!productionUrl) {
+      console.error('[OAuth] NEXT_PUBLIC_SITE_URL is not set in production')
+      throw new Error('NEXT_PUBLIC_SITE_URL must be set in production')
     }
-  } catch {
-    // localhost not reachable — fall through
-  }
-
-  // Fall back to production URL
-  if (productionUrl) {
-    console.log(`[OAuth] Localhost unreachable, using production: ${productionUrl}`)
+    console.log(`[OAuth] Production mode, using: ${productionUrl}`)
     return productionUrl
   }
 
-  // No production URL configured
-  console.error('[OAuth] Neither localhost nor NEXT_PUBLIC_SITE_URL is available')
-  throw new Error('OAuth redirect URL not configured: set NEXT_PUBLIC_SITE_URL or run on localhost')
+  // In development, use localhost (or NEXT_PUBLIC_SITE_URL if set)
+  const devUrl = productionUrl ?? 'http://localhost:3000'
+  console.log(`[OAuth] Development mode, using: ${devUrl}`)
+  return devUrl
 }
 
 export async function loginWithGoogle() {
