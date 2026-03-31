@@ -159,6 +159,14 @@ export interface LeadSource {
   created_at: string
 }
 
+export interface Profile {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -201,6 +209,11 @@ export interface Database {
         Row: LeadSource
         Insert: Omit<LeadSource, 'id' | 'created_at'>
         Update: Partial<Omit<LeadSource, 'id' | 'created_at'>>
+      }
+      profiles: {
+        Row: Profile
+        Insert: Omit<Profile, 'created_at'>
+        Update: Partial<Omit<Profile, 'id' | 'created_at'>>
       }
     }
   }

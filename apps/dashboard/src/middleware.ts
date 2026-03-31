@@ -39,6 +39,11 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Allow auth callback through (OAuth redirect)
+  if (pathname.startsWith('/auth/callback')) {
+    return supabaseResponse
+  }
+
   // Protect all other routes
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))

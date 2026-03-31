@@ -375,3 +375,41 @@ export async function getResearchJobs() {
     .order('created_at', { ascending: false })
     .limit(50)
 }
+
+// PROFILES
+
+export async function getProfileById(id: string) {
+  return supabaseAdmin
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+}
+
+export async function upsertProfile(profile: {
+  id: string
+  email: string
+  full_name?: string | null
+  avatar_url?: string | null
+}) {
+  return supabaseAdmin
+    .from('profiles')
+    .upsert(
+      {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name ?? null,
+        avatar_url: profile.avatar_url ?? null,
+      },
+      { onConflict: 'id' }
+    )
+    .select()
+    .single()
+}
+
+export async function deleteProfile(id: string) {
+  return supabaseAdmin
+    .from('profiles')
+    .delete()
+    .eq('id', id)
+}
