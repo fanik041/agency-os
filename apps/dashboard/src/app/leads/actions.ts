@@ -143,10 +143,14 @@ export async function importLeadsAction(leads: ParsedLead[], fileName?: string) 
 }
 
 export async function checkScoringLimitAction() {
+  console.log('[checkScoringLimit] Called')
   const user = await requireAuth()
+  console.log(`[checkScoringLimit] User: ${user.id}`)
   const { checkLimit } = await import('@/lib/limits')
   const { UsageAction } = await import('@agency-os/db')
-  return checkLimit(user.id, UsageAction.Score)
+  const result = await checkLimit(user.id, UsageAction.Score)
+  console.log(`[checkScoringLimit] Result:`, JSON.stringify(result))
+  return result
 }
 
 export async function checkAttioSyncLimitAction() {

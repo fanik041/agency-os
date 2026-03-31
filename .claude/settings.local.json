@@ -71,7 +71,13 @@
       "Bash(node -e \":*)",
       "Bash(npx tsx -e \":*)",
       "Bash(npx tsx:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(lsof -ti:3001)",
+      "Bash(lsof -i:3001)",
+      "Bash(lsof -ti:3000)",
+      "Bash(npx playwright:*)",
+      "Read(//Users/fahimanik/Library/Caches/ms-playwright/**)",
+      "Bash(node:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

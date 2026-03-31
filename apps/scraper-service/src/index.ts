@@ -50,6 +50,295 @@ app.get('/', (_req, res) => res.json({
 }))
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
+// ── API Docs UI ────────────────────────────────────────────────
+app.get('/docs', (_req, res) => {
+  res.type('html').send(/* html */ `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scraper API — Docs</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#e5e5e5;padding:24px 24px 80px;max-width:960px;margin:0 auto}
+  h1{font-size:1.6rem;margin-bottom:4px}
+  .sub{color:#888;font-size:.85rem;margin-bottom:28px}
+  .endpoint{background:#111;border:1px solid #222;border-radius:10px;margin-bottom:16px;overflow:hidden}
+  .ep-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none}
+  .ep-header:hover{background:#181818}
+  .method{font-weight:700;font-size:.75rem;padding:4px 10px;border-radius:4px;font-family:monospace;min-width:56px;text-align:center}
+  .method-get{background:#22c55e22;color:#4ade80;border:1px solid #22c55e44}
+  .method-post{background:#3b82f622;color:#60a5fa;border:1px solid #3b82f644}
+  .ep-path{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.9rem;color:#e5e5e5}
+  .ep-desc{color:#888;font-size:.82rem;margin-left:auto}
+  .ep-body{display:none;border-top:1px solid #222;padding:18px}
+  .ep-body.open{display:block}
+  .ep-section{margin-bottom:14px}
+  .ep-section h3{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  textarea{width:100%;min-height:100px;padding:12px;border:1px solid #333;border-radius:6px;background:#0a0a0a;color:#e5e5e5;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.82rem;resize:vertical}
+  textarea:focus{outline:none;border-color:#3b82f6}
+  .btn-row{display:flex;gap:10px;align-items:center}
+  button{padding:8px 18px;border:none;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer}
+  .btn-send{background:#3b82f6;color:#fff}
+  .btn-send:hover{background:#2563eb}
+  .btn-send:disabled{opacity:.4;cursor:not-allowed}
+  .btn-clear{background:#333;color:#ccc}
+  .btn-clear:hover{background:#444}
+  .btn-stop{background:#ef4444;color:#fff}
+  .btn-stop:hover{background:#dc2626}
+  .status-badge{font-size:.78rem;padding:2px 8px;border-radius:4px;font-weight:600}
+  .s-idle{color:#888}
+  .s-loading{color:#fbbf24;background:#fbbf2420}
+  .s-ok{color:#4ade80;background:#4ade8020}
+  .s-err{color:#f87171;background:#f8717120}
+  .s-stream{color:#60a5fa;background:#60a5fa20}
+  .response-box{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px;margin-top:12px;max-height:400px;overflow-y:auto;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.78rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:none}
+  .response-box.visible{display:block}
+  .log-info{color:#d4d4d4}.log-warn{color:#facc15}.log-error{color:#f87171}.log-lead{color:#4ade80}.log-done{color:#38bdf8;font-weight:700}.log-scored{color:#a78bfa}.log-contact{color:#f0abfc}
+  .tag{font-size:.7rem;padding:2px 6px;border-radius:3px;font-weight:600}
+  .tag-sse{background:#8b5cf620;color:#a78bfa;border:1px solid #8b5cf640}
+  .tag-auth{background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b40}
+  .auth-bar{background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px}
+  .auth-bar label{font-size:.82rem;color:#aaa;white-space:nowrap}
+  .auth-bar input{flex:1;padding:8px 12px;border:1px solid #333;border-radius:6px;background:#0a0a0a;color:#e5e5e5;font-family:monospace;font-size:.82rem}
+  .auth-bar input:focus{outline:none;border-color:#3b82f6}
+  .chevron{color:#555;transition:transform .2s;font-size:.8rem}
+  .chevron.open{transform:rotate(90deg)}
+</style>
+</head>
+<body>
+<h1>Scraper API</h1>
+<p class="sub">Agency OS — Interactive API Explorer</p>
+
+<div class="auth-bar">
+  <label for="authToken">Bearer Token</label>
+  <input type="text" id="authToken" placeholder="Leave empty for dev mode (no auth)">
+</div>
+
+<div id="endpoints"></div>
+
+<script>
+const ENDPOINTS = [
+  { method:'GET', path:'/', desc:'Service info & endpoint list', body:null, tags:[] },
+  { method:'GET', path:'/health', desc:'Health check', body:null, tags:[] },
+  { method:'GET', path:'/jobs', desc:'List recent scrape jobs', body:null, tags:['auth'] },
+  { method:'POST', path:'/scrape', desc:'Start a scrape job (returns job ID)',
+    body:JSON.stringify({niches:["dentist","plumber"],location:"Austin, TX",maxPerNiche:20,withEmails:false},null,2), tags:['auth'] },
+  { method:'POST', path:'/scrape/stream', desc:'Start scrape with SSE live logs',
+    body:JSON.stringify({niches:["dentist"],location:"Austin, TX",maxPerNiche:5,withEmails:false},null,2), tags:['auth','sse'] },
+  { method:'POST', path:'/research', desc:'Start decision-maker research',
+    body:JSON.stringify({leadIds:["lead-uuid-1","lead-uuid-2"]},null,2), tags:['auth'] },
+  { method:'POST', path:'/research/stream', desc:'Research with SSE live logs',
+    body:JSON.stringify({leadIds:["lead-uuid-1"]},null,2), tags:['auth','sse'] },
+  { method:'POST', path:'/score/stream', desc:'Score leads with AI (SSE)',
+    body:JSON.stringify({leadIds:["lead-uuid-1"]},null,2), tags:['auth','sse'],
+    note:'Pass empty leadIds or omit to score all unscored leads.' },
+  { method:'POST', path:'/analyze', desc:'Analyze a website (13 signals)',
+    body:JSON.stringify({url:"https://example.com"},null,2), tags:['auth'] },
+];
+
+const container = document.getElementById('endpoints');
+const controllers = {};
+
+function el(tag, attrs, children) {
+  const e = document.createElement(tag);
+  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
+    if (k === 'className') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'textContent') e.textContent = v;
+    else e.setAttribute(k, v);
+  });
+  if (children) children.forEach(c => { if (c) e.appendChild(c); });
+  return e;
+}
+
+function getAuthHeaders() {
+  const token = document.getElementById('authToken').value.trim();
+  const h = { 'Content-Type': 'application/json' };
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+}
+
+ENDPOINTS.forEach((ep, i) => {
+  const isSSE = ep.tags.includes('sse');
+  const id = 'ep-' + i;
+
+  const tagEls = ep.tags.map(t => {
+    const cls = t === 'sse' ? 'tag tag-sse' : 'tag tag-auth';
+    return el('span', { className: cls, textContent: t.toUpperCase() });
+  });
+
+  const chev = el('span', { className: 'chevron', id: id+'-chev', textContent: '\\u25B6' });
+  const methodBadge = el('span', { className: 'method method-'+ep.method.toLowerCase(), textContent: ep.method });
+  const pathEl = el('span', { className: 'ep-path', textContent: ep.path });
+  const descEl = el('span', { className: 'ep-desc', textContent: ep.desc });
+
+  const headerChildren = [chev, methodBadge, pathEl, ...tagEls, descEl];
+  const header = el('div', { className: 'ep-header' }, headerChildren);
+  header.addEventListener('click', () => {
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+  });
+
+  const bodyChildren = [];
+
+  if (ep.body) {
+    const ta = el('textarea', { id: id+'-body' });
+    ta.value = ep.body;
+    const sectionTitle = el('h3', { textContent: 'Request Body' });
+    const section = el('div', { className: 'ep-section' }, [sectionTitle, ta]);
+    if (ep.note) {
+      const noteEl = el('div', { textContent: ep.note });
+      noteEl.style.cssText = 'color:#888;font-size:.78rem;margin-top:4px';
+      section.appendChild(noteEl);
+    }
+    bodyChildren.push(section);
+  }
+
+  const sendBtn = el('button', { className: 'btn-send', id: id+'-send', textContent: 'Send Request' });
+  const clearBtn = el('button', { className: 'btn-clear', textContent: 'Clear' });
+  const statusEl = el('span', { className: 'status-badge s-idle', id: id+'-status', textContent: 'idle' });
+  const respBox = el('div', { className: 'response-box', id: id+'-resp' });
+
+  const btnRowChildren = [sendBtn];
+  let stopBtn = null;
+  if (isSSE) {
+    stopBtn = el('button', { className: 'btn-stop', id: id+'-stop', textContent: 'Stop Stream' });
+    stopBtn.style.display = 'none';
+    stopBtn.addEventListener('click', () => stopStream(id));
+    btnRowChildren.push(stopBtn);
+  }
+  btnRowChildren.push(clearBtn, statusEl);
+  const btnRow = el('div', { className: 'btn-row' }, btnRowChildren);
+  bodyChildren.push(btnRow, respBox);
+
+  const body = el('div', { className: 'ep-body', id: id }, bodyChildren);
+  const endpoint = el('div', { className: 'endpoint' }, [header, body]);
+  container.appendChild(endpoint);
+
+  clearBtn.addEventListener('click', () => {
+    while (respBox.firstChild) respBox.removeChild(respBox.firstChild);
+    respBox.classList.remove('visible');
+    setStatus(id, 's-idle', 'idle');
+  });
+
+  sendBtn.addEventListener('click', () => sendRequest(id, i));
+});
+
+function setStatus(id, cls, text) {
+  const el = document.getElementById(id + '-status');
+  el.className = 'status-badge ' + cls;
+  el.textContent = text;
+}
+
+function appendLine(id, text, cls) {
+  const resp = document.getElementById(id + '-resp');
+  resp.classList.add('visible');
+  const span = document.createElement('span');
+  span.className = cls || 'log-info';
+  span.textContent = text + '\\n';
+  resp.appendChild(span);
+  resp.scrollTop = resp.scrollHeight;
+}
+
+function stopStream(id) {
+  if (controllers[id]) { controllers[id].abort(); delete controllers[id]; }
+  const stopBtn = document.getElementById(id + '-stop');
+  if (stopBtn) stopBtn.style.display = 'none';
+  document.getElementById(id + '-send').disabled = false;
+  setStatus(id, 's-idle', 'stopped');
+}
+
+async function sendRequest(id, idx) {
+  const ep = ENDPOINTS[idx];
+  const isSSE = ep.tags.includes('sse');
+  const resp = document.getElementById(id + '-resp');
+  while (resp.firstChild) resp.removeChild(resp.firstChild);
+  resp.classList.add('visible');
+
+  const sendBtn = document.getElementById(id + '-send');
+  const stopBtn = document.getElementById(id + '-stop');
+  sendBtn.disabled = true;
+
+  const opts = { method: ep.method, headers: getAuthHeaders() };
+
+  if (ep.body) {
+    const bodyEl = document.getElementById(id + '-body');
+    try { JSON.parse(bodyEl.value); opts.body = bodyEl.value; }
+    catch (e) {
+      appendLine(id, 'Invalid JSON: ' + e.message, 'log-error');
+      sendBtn.disabled = false;
+      setStatus(id, 's-err', 'invalid json');
+      return;
+    }
+  }
+
+  if (isSSE) {
+    setStatus(id, 's-stream', 'streaming');
+    const ctrl = new AbortController();
+    controllers[id] = ctrl;
+    opts.signal = ctrl.signal;
+    if (stopBtn) stopBtn.style.display = '';
+
+    try {
+      const response = await fetch(ep.path, opts);
+      if (!response.ok) {
+        const errText = await response.text();
+        appendLine(id, 'HTTP ' + response.status + ': ' + errText, 'log-error');
+        setStatus(id, 's-err', String(response.status));
+        sendBtn.disabled = false;
+        if (stopBtn) stopBtn.style.display = 'none';
+        return;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\\n');
+        buf = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith(':') || !line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            const cls = { log:'log-info', info:'log-info', warn:'log-warn', error:'log-error',
+              lead:'log-lead', done:'log-done', scored:'log-scored', contact:'log-contact' }[evt.type] || 'log-info';
+            appendLine(id, '[' + evt.type + '] ' + evt.message, cls);
+            if (evt.type === 'done') setStatus(id, 's-ok', 'done');
+            if (evt.type === 'error') setStatus(id, 's-err', 'error');
+          } catch {}
+        }
+      }
+      if (document.getElementById(id+'-status').textContent === 'streaming') setStatus(id, 's-ok', 'done');
+    } catch (err) {
+      if (err.name !== 'AbortError') { appendLine(id, 'Error: ' + err.message, 'log-error'); setStatus(id, 's-err', 'error'); }
+    }
+    sendBtn.disabled = false;
+    if (stopBtn) stopBtn.style.display = 'none';
+    delete controllers[id];
+  } else {
+    setStatus(id, 's-loading', 'loading');
+    try {
+      const response = await fetch(ep.path, opts);
+      const text = await response.text();
+      let display; try { display = JSON.stringify(JSON.parse(text), null, 2); } catch { display = text; }
+      appendLine(id, 'HTTP ' + response.status, response.ok ? 'log-done' : 'log-error');
+      appendLine(id, display, response.ok ? 'log-info' : 'log-error');
+      setStatus(id, response.ok ? 's-ok' : 's-err', String(response.status));
+    } catch (err) {
+      appendLine(id, 'Error: ' + err.message, 'log-error');
+      setStatus(id, 's-err', 'error');
+    }
+    sendBtn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>`);
+});
+
 // ── POST /scrape ────────────────────────────────────────────────
 // Starts a scraping job. Returns immediately with the job ID.
 // Scraping runs in the background and updates Supabase in real time.
@@ -506,6 +795,7 @@ app.post('/research/stream', authMiddleware, async (req, res) => {
 
 // ── POST /score/stream — SSE endpoint ─────────────────────────
 app.post('/score/stream', authMiddleware, async (req, res) => {
+  console.log('[score/stream] Endpoint hit, body:', JSON.stringify(req.body))
   const { leadIds } = req.body
 
   res.writeHead(200, {
@@ -528,50 +818,90 @@ app.post('/score/stream', authMiddleware, async (req, res) => {
   let disconnected = false
   req.on('close', () => { disconnected = true })
 
+  // Heartbeat every 30s to prevent upstream proxy body-timeout
+  const heartbeat = setInterval(() => {
+    if (!disconnected) {
+      res.write(':heartbeat\n\n')
+      if (typeof (res as any).flush === 'function') (res as any).flush()
+    }
+  }, 30_000)
+
   const onLog = (type: string, message: string, data?: unknown) => {
     if (!disconnected) send(type, message, data)
   }
 
-  await runScoringJob(leadIds ?? null, onLog)
+  console.log('[score/stream] Starting runScoringJob, leadIds:', leadIds)
+  try {
+    await runScoringJob(leadIds ?? null, onLog)
+    console.log('[score/stream] runScoringJob completed')
+  } catch (err) {
+    console.error('[score/stream] runScoringJob crashed:', err)
+    const errMsg = err instanceof Error ? err.message : String(err)
+    if (!disconnected) {
+      const payload = JSON.stringify({ type: 'error', message: `Fatal: ${errMsg}` })
+      res.write(`data: ${payload}\n\n`)
+      if (typeof (res as any).flush === 'function') (res as any).flush()
+    }
+  }
 
+  clearInterval(heartbeat)
   if (!disconnected) res.end()
+  console.log('[score/stream] Response ended')
 })
 
 async function runScoringJob(
   leadIds: string[] | null,
   onLog: (type: string, message: string, data?: unknown) => void,
 ) {
+  console.log('[runScoringJob] Starting, leadIds:', leadIds)
   let scored = 0
   let skipped = 0
   let failed = 0
   let totalProducts = 0
 
   const emit = (type: string, message: string, data?: unknown) => {
+    console.log(`[runScoringJob] emit(${type}): ${message}`)
     onLog(type, message, data)
   }
 
   try {
     // Reset any leads with null pain_score back to 'new' so they get picked up
-    const { count: resetCount } = await resetUnscoredLeadsToNew()
-    if (resetCount && resetCount > 0) {
-      emit(ScoringLogType.Info, `Reset ${resetCount} unscored lead(s) to "new" status`)
+    console.log('[runScoringJob] Resetting unscored leads to new...')
+    const { count: resetCount, error: resetError } = await resetUnscoredLeadsToNew()
+    if (resetError) {
+      console.error('[runScoringJob] Reset failed:', resetError.message)
+      emit(ScoringLogType.Error, `Failed to reset unscored leads: ${resetError.message}`)
+    } else {
+      console.log(`[runScoringJob] Reset ${resetCount ?? 0} leads`)
+      if (resetCount && resetCount > 0) {
+        emit(ScoringLogType.Info, `Reset ${resetCount} unscored lead(s) to "new" status`)
+      }
     }
 
     let leads: Awaited<ReturnType<typeof getUnscoredLeads>>['data']
 
     if (leadIds && leadIds.length > 0) {
+      console.log(`[runScoringJob] Fetching ${leadIds.length} specific leads`)
       const results: NonNullable<typeof leads> = []
       for (const id of leadIds) {
-        const { data } = await getLeadById(id)
+        const { data, error } = await getLeadById(id)
+        if (error) console.error(`[runScoringJob] Failed to fetch lead ${id}:`, error.message)
         if (data) results.push(data)
       }
       leads = results
     } else {
-      const { data } = await getUnscoredLeads()
+      console.log('[runScoringJob] Fetching all unscored leads')
+      const { data, error } = await getUnscoredLeads()
+      if (error) {
+        console.error('[runScoringJob] Failed to fetch unscored leads:', error.message)
+        emit(ScoringLogType.Error, `Failed to fetch leads: ${error.message}`)
+      }
       leads = data
+      console.log(`[runScoringJob] Got ${leads?.length ?? 0} unscored leads`)
     }
 
     if (!leads || leads.length === 0) {
+      console.log('[runScoringJob] No leads to score, emitting done')
       emit(ScoringLogType.Done, 'No unscored leads found', { scored: 0, skipped: 0, failed: 0, totalProducts: 0 })
       return
     }
@@ -582,6 +912,7 @@ async function runScoringJob(
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i]
       const progress = `[${i + 1}/${total}]`
+      console.log(`[runScoringJob] ${progress} Processing "${lead.name}" (pain_score=${lead.pain_score}, website=${lead.website})`)
 
       try {
         if (lead.pain_score != null) {
@@ -706,8 +1037,12 @@ async function runScoringJob(
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    const stack = err instanceof Error ? err.stack : ''
+    console.error('[runScoringJob] FATAL ERROR:', message)
+    console.error('[runScoringJob] Stack:', stack)
     emit(ScoringLogType.Error, `Fatal error: ${message}`)
   }
+  console.log('[runScoringJob] Function exiting')
 }
 
 async function runResearchJob(
@@ -847,7 +1182,17 @@ for (const key of required) {
   }
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err.message)
+  console.error(err.stack)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason)
+})
+
 app.listen(PORT, () => {
   console.log(`Scraper service running on port ${PORT}`)
   console.log(`Auth: ${SCRAPER_SECRET ? 'enabled' : 'disabled (dev mode)'}`)
+  console.log(`OpenAI: ${process.env.OPENAI_API_KEY ? 'configured' : 'NOT SET'}`)
 })

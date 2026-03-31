@@ -31,9 +31,21 @@ async function getLifetimeUsageTotal(userId: string, action: UsageAction): Promi
 }
 
 export async function checkLimit(userId: string, action: UsageAction): Promise<LimitCheckResult> {
+  console.log(`[checkLimit] userId=${userId}, action=${action}`)
+
   // Admin bypass
-  const { data: profile } = await getProfileById(userId)
-  if (profile?.is_admin) {
+  const { data: profile, error: profileError } = await getProfileById(userId)
+  if (profileError) {
+    console.error(`[checkLimit] Failed to fetch profile: ${profileError.message}`)
+    return { allowed: false, reason: `Profile lookup failed: ${profileError.message}` }
+  }
+  if (!profile) {
+    console.error(`[checkLimit] No profile found for userId=${userId}`)
+    return { allowed: false, reason: 'User profile not found' }
+  }
+  console.log(`[checkLimit] Profile found: is_admin=${profile.is_admin}`)
+  if (profile.is_admin) {
+    console.log('[checkLimit] Admin bypass — allowed')
     return { allowed: true }
   }
 
