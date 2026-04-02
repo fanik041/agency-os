@@ -226,12 +226,19 @@ export async function scrapeGoogleMaps(
         await link.click()
         await page.waitForTimeout(randomDelay(2500, 4000))
 
+        // Wait for the detail panel to fully load before extracting rating/reviews
+        // The rating element is a reliable indicator the panel has rendered
+        await page.waitForSelector('span.MW4etd', { timeout: 5000 }).catch(() => null)
+
         // Extract rating
         let rating: number | null = null
         try {
           const ratingText = await page.$eval('span.MW4etd', (el) => el.textContent?.trim())
           if (ratingText) rating = parseFloat(ratingText)
         } catch {}
+
+        // Wait for review count element separately
+        await page.waitForSelector('span.UY7F9', { timeout: 3000 }).catch(() => null)
 
         // Extract review count
         let review_count = 0
