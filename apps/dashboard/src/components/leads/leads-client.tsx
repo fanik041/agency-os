@@ -11,7 +11,6 @@ import { LeadFilters } from './lead-filters'
 import { PaginationControls } from './pagination-controls'
 import { ResearchLogModal } from './research-log-modal'
 import { ScoreLeadsButton } from './score-leads-button'
-import { SyncAttioButton } from './update-attio-button'
 import { toast } from 'sonner'
 import { UserSearch, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -75,7 +74,6 @@ export function LeadsClient({
       'Review Count': lead.review_count ?? 0,
       'Pain Score': lead.pain_score ?? '',
       Status: lead.status,
-      'Attio Sync': lead.attio_sync_status ?? '',
       'Suggested Angle': lead.suggested_angle ?? '',
       'Message Draft': lead.message_draft ?? '',
       Notes: lead.notes ?? '',
@@ -101,7 +99,6 @@ export function LeadsClient({
             {selectedIds.size > 0 ? `Export Selected (${selectedIds.size})` : 'Export XLSX'}
           </Button>
           <ScoreLeadsButton leadIds={selectedIds.size > 0 ? Array.from(selectedIds) : undefined} />
-          <SyncAttioButton />
           {selectedIds.size > 0 && (
             <Button onClick={handleResearchSelected} size="sm">
               <UserSearch className="mr-2 h-4 w-4" />

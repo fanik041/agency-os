@@ -1,5 +1,5 @@
 import type { LeadRepository, LeadSourceRepository } from '@agency-os/db'
-import { LeadStatus, CallOutcome, AttioSyncStatus, LeadSourceType } from '@agency-os/db'
+import { LeadStatus, CallOutcome, LeadSourceType } from '@agency-os/db'
 
 export class LeadService {
   constructor(
@@ -42,8 +42,8 @@ export class LeadService {
       seo_issues: null, has_cta: null, phone_on_site: null,
       hours_on_site: null, has_social_proof: null, tech_stack: null,
       analyze: null, status: LeadStatus.New as LeadStatus,
-      attio_sync_status: AttioSyncStatus.NotSynced as AttioSyncStatus,
-      attio_synced_at: null, source_id: source.id,
+      source_id: source.id,
+      deleted_at: null,
     }))
 
     const result = await this.leadRepo.bulkUpsert(leadsToInsert)

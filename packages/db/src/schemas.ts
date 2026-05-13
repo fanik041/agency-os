@@ -32,15 +32,6 @@ export const importLeadsSchema = z.object({
   fileName: z.string().max(500).optional(),
 })
 
-// -- Attio Sync --
-export const updateSingleAttioEntrySchema = z.object({
-  leadId: z.string().uuid(),
-  leadName: z.string().min(1),
-  recordId: z.string().min(1),
-  entryValues: z.record(z.string(), z.unknown()),
-  changedFields: z.array(z.string()),
-})
-
 // -- Scraper --
 export const triggerScrapeSchema = z.object({
   niches: z.array(z.string().min(1)).min(1),
@@ -112,4 +103,89 @@ export const addRevenueEventSchema = z.object({
 export const updateJobStatusSchema = z.object({
   jobId: z.string().uuid(),
   status: z.enum(['done', 'failed']),
+})
+
+// -- CRM tab --
+
+const editableLeadFields = [
+  'name', 'website', 'phone', 'email_found', 'niche', 'city', 'address',
+  'notes', 'message_draft', 'suggested_angle', 'pain_points', 'reviews_raw',
+  'pain_score', 'review_count', 'rating',
+  'has_booking', 'has_chat_widget', 'has_contact_form', 'analyze',
+  'status', 'follow_up_date',
+] as const
+
+export const updateLeadFieldSchema = z.object({
+  leadId: z.string().uuid(),
+  field: z.enum(editableLeadFields),
+  value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+})
+
+export const bulkUpdateLeadsStatusSchema = z.object({
+  leadIds: z.array(z.string().uuid()).min(1).max(1000),
+  status: z.nativeEnum(LeadStatus),
+})
+
+export const softDeleteLeadsSchema = z.object({
+  leadIds: z.array(z.string().uuid()).min(1).max(1000),
+})
+
+export const restoreLeadsSchema = z.object({
+  leadIds: z.array(z.string().uuid()).min(1).max(1000),
+})
+
+export const listLeadsForCrmSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(500).default(100),
+  search: z.string().max(200).optional(),
+  sortField: z.string().max(50).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
+  statusFilter: z.array(z.nativeEnum(LeadStatus)).optional(),
+  cityFilter: z.array(z.string()).optional(),
+  nicheFilter: z.array(z.string()).optional(),
+  minPainScore: z.number().int().min(0).max(100).optional(),
+  maxPainScore: z.number().int().min(0).max(100).optional(),
+  includeDeleted: z.boolean().default(false),
+})
+
+export const importLeadsCrmRowSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1).max(500),
+  website: z.string().max(2000).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  email_found: z.string().email().optional().nullable().or(z.literal('').transform(() => null)),
+  niche: z.string().max(200).optional().nullable(),
+  city: z.string().max(200).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  notes: z.string().max(10000).optional().nullable(),
+  status: z.nativeEnum(LeadStatus).optional(),
+  pain_score: z.number().int().min(0).max(100).optional().nullable(),
+  review_count: z.number().int().min(0).optional(),
+  rating: z.number().min(0).max(5).optional().nullable(),
+  has_booking: z.boolean().optional(),
+  has_chat_widget: z.boolean().optional(),
+  has_contact_form: z.boolean().optional(),
+  analyze: z.string().max(10000).optional().nullable(),
+  message_draft: z.string().max(20000).optional().nullable(),
+  suggested_angle: z.string().max(20000).optional().nullable(),
+  pain_points: z.string().max(20000).optional().nullable(),
+  reviews_raw: z.string().max(50000).optional().nullable(),
+  follow_up_date: z.string().optional().nullable(),
+})
+
+export const importLeadsCrmSchema = z.object({
+  rows: z.array(importLeadsCrmRowSchema).min(1).max(10000),
+  fileName: z.string().max(500).optional(),
+})
+
+export const createLeadCrmSchema = z.object({
+  name: z.string().min(1).max(500),
+  website: z.string().max(2000).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  email_found: z.string().email().optional().nullable().or(z.literal('')),
+  niche: z.string().max(200).optional().nullable(),
+  city: z.string().max(200).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  notes: z.string().max(10000).optional().nullable(),
+  status: z.nativeEnum(LeadStatus).default(LeadStatus.New),
 })

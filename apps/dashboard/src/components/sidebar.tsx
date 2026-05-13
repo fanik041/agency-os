@@ -12,6 +12,7 @@ import {
   DollarSign,
   Globe,
   Menu,
+  Table,
   X,
   LogOut,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import { logout } from '@/app/login/actions'
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
+  { href: '/crm', label: 'CRM', icon: Table },
   { href: '/scraper', label: 'Scraper', icon: Search },
   { href: '/contacts', label: 'Contacts', icon: UserSearch },
   { href: '/clients', label: 'Clients', icon: Briefcase },

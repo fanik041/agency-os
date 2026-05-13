@@ -82,7 +82,6 @@ export function LeadsTable({
             <TableHead className="text-center w-[5%]">Count</TableHead>
             <TableHead className="text-center w-[4%]">Pain</TableHead>
             <TableHead className="w-[8%]">Status</TableHead>
-            <TableHead className="w-[6%]">Attio</TableHead>
             <TableHead className="text-center w-[4%]">Reviews</TableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -173,14 +172,6 @@ function LeadRow({
         <TableCell>
           <Badge variant="secondary" className={STATUS_COLORS[lead.status]}>
             {LEAD_STATUS_LABELS[lead.status]}
-          </Badge>
-        </TableCell>
-        <TableCell>
-          <Badge
-            variant="secondary"
-            className={lead.attio_sync_status === 'synced' ? 'bg-green-500/15 text-green-500' : 'bg-zinc-500/15 text-zinc-400'}
-          >
-            {lead.attio_sync_status === 'synced' ? 'Synced' : 'Not Synced'}
           </Badge>
         </TableCell>
         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>

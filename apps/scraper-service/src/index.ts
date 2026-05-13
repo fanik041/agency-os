@@ -7,7 +7,7 @@ import {
   createScrapeJob, updateScrapeJob, getScrapeJobs, upsertLead,
   getLeadById, createResearchJob, updateResearchJob, upsertContact,
   createLeadSource, updateLeadSourceCount,
-  ScrapeJobStatus, LeadStatus, AttioSyncStatus, LeadSourceType,
+  ScrapeJobStatus, LeadStatus, LeadSourceType,
   ResearchJobStatus, ContactSource,
   getUnscoredLeads, resetUnscoredLeadsToNew, updateLeadScoring, updateLeadStatus,
 } from '@agency-os/db'
@@ -681,9 +681,8 @@ async function runScrapeJob(
             analyze: null,
             status: LeadStatus.New,
             notes: null,
-            attio_sync_status: AttioSyncStatus.NotSynced,
-            attio_synced_at: null,
             source_id: sourceId,
+            deleted_at: null,
           })
           if (!error) {
             await updateScrapeJob(jobId, { leads_found: totalLeads })

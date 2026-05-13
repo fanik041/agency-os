@@ -159,17 +159,6 @@ export function CallLoggerSheet({
                 <span className="max-w-[360px] text-right text-xs leading-relaxed">{lead.notes}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Attio Sync</span>
-              <span className={`font-medium text-xs ${
-                lead.attio_sync_status === 'synced' ? 'text-green-600' :
-                lead.attio_sync_status === 'failed' ? 'text-red-600' : 'text-muted-foreground'
-              }`}>
-                {lead.attio_sync_status === 'synced' ? 'Synced' :
-                 lead.attio_sync_status === 'failed' ? 'Failed' : 'Not synced'}
-                {lead.attio_synced_at && ` (${lead.attio_synced_at.slice(0, 10)})`}
-              </span>
-            </div>
           </div>
 
           {lead.reviews_raw && (

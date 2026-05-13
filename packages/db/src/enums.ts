@@ -11,12 +11,6 @@ export enum LeadStatus {
   Skip = 'skip',
 }
 
-export enum AttioSyncStatus {
-  NotSynced = 'not_synced',
-  Synced = 'synced',
-  Failed = 'failed',
-}
-
 export enum ScrapeJobStatus {
   Queued = 'queued',
   Running = 'running',
@@ -75,7 +69,6 @@ export enum UsageAction {
   Score = 'score',
   Scrape = 'scrape',
   ScrapeLarge = 'scrape_large',
-  AttioSync = 'attio_sync',
   LeadOverage = 'lead_overage',
 }
 

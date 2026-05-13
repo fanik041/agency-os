@@ -3,8 +3,6 @@ import {
   ScrapeJobRepository, ClientRepository, ContactRepository,
   ResearchJobRepository, RevenueEventRepository,
 } from '@agency-os/db'
-import { AttioClient } from '@agency-os/attio'
-import { AttioSyncService } from '@/services/attio-sync-service'
 import { LeadService } from '@/services/lead-service'
 import { ScraperService } from '@/services/scraper-service'
 
@@ -18,7 +16,6 @@ interface Container {
   revenueRepo: RevenueEventRepository
   // Services
   leadService: LeadService
-  attioSyncService: AttioSyncService
   scraperService: ScraperService
 }
 
@@ -40,18 +37,12 @@ function createContainer(): Container {
   const researchJobRepo = new ResearchJobRepository()
   const revenueRepo = new RevenueEventRepository()
 
-  const attioClient = new AttioClient(
-    requireEnv('ATTIO_API_KEY'),
-    requireEnv('ATTIO_LIST_ID'),
-  )
-
   const leadService = new LeadService(leadRepo, sourceRepo)
-  const attioSyncService = new AttioSyncService(attioClient, leadRepo)
   const scraperService = new ScraperService(jobRepo, requireEnv('SCRAPER_SERVICE_URL'), process.env.SCRAPER_SECRET)
 
   return {
     leadRepo, callLogRepo, clientRepo, contactRepo, researchJobRepo, revenueRepo,
-    leadService, attioSyncService, scraperService,
+    leadService, scraperService,
   }
 }
 

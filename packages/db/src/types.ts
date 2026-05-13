@@ -1,6 +1,5 @@
 import type {
   LeadStatus,
-  AttioSyncStatus,
   ScrapeJobStatus,
   CallOutcome,
   RevenueType,
@@ -14,7 +13,6 @@ import type {
 
 export type {
   LeadStatus,
-  AttioSyncStatus,
   ScrapeJobStatus,
   CallOutcome,
   RevenueType,
@@ -66,8 +64,7 @@ export interface Lead {
   tech_stack: string | null
   analyze: string | null
   source_id: string | null
-  attio_sync_status: AttioSyncStatus
-  attio_synced_at: string | null
+  deleted_at: string | null
   created_at: string
 }
 
@@ -182,12 +179,10 @@ export interface SubscriptionPlan {
   max_scrapes_per_month: number | null
   max_scrapes_lifetime: number | null
   max_scrape_leads_lifetime: number | null
-  attio_sync_enabled: boolean
   cost_per_score_cents: number
   cost_per_scrape_cents: number
   cost_per_scrape_large_cents: number
   cost_per_lead_overage_cents: number
-  cost_per_attio_sync_cents: number
   created_at: string
 }
 

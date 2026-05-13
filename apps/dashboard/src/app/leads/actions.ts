@@ -7,7 +7,6 @@ import { container } from '@/lib/container'
 import type { LeadStatus, CallOutcome } from '@agency-os/db'
 import {
   updateLeadStatusSchema, logCallSchema, importLeadsSchema,
-  updateSingleAttioEntrySchema,
 } from '@agency-os/db'
 
 export async function updateLeadStatusAction(leadId: string, status: LeadStatus, notes?: string) {
@@ -40,56 +39,6 @@ export async function logCallAction(
   revalidatePath('/leads')
 }
 
-export async function fetchAttioEntriesAction() {
-  await requireAuth()
-  try {
-    const result = await container.attioSyncService.fetchEntries()
-    return { ok: true as const, ...result }
-  } catch (err) {
-    return { ok: false as const, error: String(err), entries: [] as { company_name: string; values: Record<string, unknown> }[] }
-  }
-}
-
-export async function findMissingInAttioAction() {
-  unstable_noStore()
-  await requireAuth()
-  try {
-    const [leads, attioResult] = await Promise.all([
-      container.leadRepo.getAll(),
-      container.attioSyncService.fetchEntries(),
-    ])
-    const attioNames = new Set(
-      attioResult.entries.map(e => e.company_name.toLowerCase().trim())
-    )
-    const missing = leads
-      .filter(l => !attioNames.has(l.name.toLowerCase().trim()))
-      .map(l => ({ id: l.id, name: l.name, address: l.address, website: l.website }))
-    return { ok: true as const, supabaseCount: leads.length, attioCount: attioResult.entries.length, missing }
-  } catch (err) {
-    return { ok: false as const, error: String(err), supabaseCount: 0, attioCount: 0, missing: [] as { id: string; name: string; address: string | null; website: string | null }[] }
-  }
-}
-
-export async function compareAttioAction() {
-  unstable_noStore()
-  await requireAuth()
-  try {
-    const result = await container.attioSyncService.compare()
-    return { ok: true as const, ...result }
-  } catch (err) {
-    return { ok: false as const, error: String(err), diffs: [], newEntries: [], unchanged: 0, supabaseCount: 0, attioCount: 0 }
-  }
-}
-
-export async function deduplicateAttioAction() {
-  await requireAuth()
-  try {
-    return { ok: true as const, ...await container.attioSyncService.deduplicate() }
-  } catch (err) {
-    return { ok: false as const, error: String(err), duplicatesFound: 0, removed: 0, failed: 0 }
-  }
-}
-
 export async function deduplicateLeadsAction() {
   await requireAuth()
   try {
@@ -100,29 +49,6 @@ export async function deduplicateLeadsAction() {
     return { ok: false as const, error: String(err), duplicatesFound: 0, merged: 0, deleted: 0, errors: [] as string[] }
   }
 }
-
-export async function updateSingleAttioEntryAction(entry: {
-  leadId: string
-  leadName: string
-  recordId: string
-  entryValues: Record<string, unknown>
-  changedFields: string[]
-}) {
-  await requireAuth()
-  const parsed = updateSingleAttioEntrySchema.parse(entry)
-  return container.attioSyncService.syncEntry(parsed)
-}
-
-export async function createNewAttioEntryAction(entry: {
-  leadId: string
-  leadName: string
-  domain?: string
-  entryValues: Record<string, unknown>
-}) {
-  await requireAuth()
-  return container.attioSyncService.createEntry(entry)
-}
-
 
 interface ParsedLead {
   name: string
@@ -153,9 +79,3 @@ export async function checkScoringLimitAction() {
   return result
 }
 
-export async function checkAttioSyncLimitAction() {
-  const user = await requireAuth()
-  const { checkLimit } = await import('@/lib/limits')
-  const { UsageAction } = await import('@agency-os/db')
-  return checkLimit(user.id, UsageAction.AttioSync)
-}

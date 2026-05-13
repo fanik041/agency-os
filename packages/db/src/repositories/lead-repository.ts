@@ -1,12 +1,13 @@
 import { supabaseAdmin } from '../client'
 import type { Lead, LeadSource } from '../types'
-import type { LeadStatus, AttioSyncStatus } from '../enums'
+import type { LeadStatus } from '../enums'
 
 export class LeadRepository {
   async getAll(): Promise<Lead[]> {
     const { data, error } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
     if (error) throw new Error(`Failed to fetch leads: ${error.message}`)
     return data as Lead[]
@@ -40,6 +41,8 @@ export class LeadRepository {
       .select('*', { count: 'exact' })
       .order('pain_score', { ascending: false, nullsFirst: false })
 
+    query = query.is('deleted_at', null)
+
     if (filters.city) query = query.eq('city', filters.city)
     if (filters.niche) query = query.eq('niche', filters.niche)
     if (filters.status) query = query.eq('status', filters.status)
@@ -65,6 +68,7 @@ export class LeadRepository {
     const { data, error } = await supabaseAdmin
       .from('leads')
       .select('id, name, niche, city')
+      .is('deleted_at', null)
       .order('name', { ascending: true })
     if (error) throw new Error(`Failed to fetch leads: ${error.message}`)
     return data as { id: string; name: string; niche: string | null; city: string | null }[]
@@ -83,18 +87,103 @@ export class LeadRepository {
     return data as Lead
   }
 
-  async updateAttioSync(id: string, syncStatus: AttioSyncStatus): Promise<Lead> {
+  async softDelete(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    const { error } = await supabaseAdmin
+      .from('leads')
+      .update({ deleted_at: new Date().toISOString() })
+      .in('id', ids)
+    if (error) throw new Error(`Failed to soft-delete leads: ${error.message}`)
+  }
+
+  async restore(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    const { error } = await supabaseAdmin
+      .from('leads')
+      .update({ deleted_at: null })
+      .in('id', ids)
+    if (error) throw new Error(`Failed to restore leads: ${error.message}`)
+  }
+
+  async listForCrm(params: {
+    page: number
+    pageSize: number
+    search?: string
+    sortField?: keyof Lead
+    sortDir?: 'asc' | 'desc'
+    statusFilter?: LeadStatus[]
+    cityFilter?: string[]
+    nicheFilter?: string[]
+    minPainScore?: number
+    maxPainScore?: number
+    includeDeleted: boolean
+  }): Promise<{ data: Lead[]; count: number }> {
+    const from = (params.page - 1) * params.pageSize
+    const to = from + params.pageSize - 1
+
+    let query = supabaseAdmin
+      .from('leads')
+      .select('*', { count: 'exact' })
+
+    if (!params.includeDeleted) {
+      query = query.is('deleted_at', null)
+    }
+
+    if (params.search) {
+      const s = `%${params.search}%`
+      query = query.or(
+        `name.ilike.${s},phone.ilike.${s},email_found.ilike.${s},website.ilike.${s},city.ilike.${s},niche.ilike.${s}`,
+      )
+    }
+
+    if (params.statusFilter?.length) query = query.in('status', params.statusFilter)
+    if (params.cityFilter?.length) query = query.in('city', params.cityFilter)
+    if (params.nicheFilter?.length) query = query.in('niche', params.nicheFilter)
+    if (params.minPainScore != null) query = query.gte('pain_score', params.minPainScore)
+    if (params.maxPainScore != null) query = query.lte('pain_score', params.maxPainScore)
+
+    const sortField = params.sortField ?? 'created_at'
+    const sortDir = params.sortDir ?? 'desc'
+    query = query.order(sortField as string, { ascending: sortDir === 'asc', nullsFirst: false })
+
+    query = query.range(from, to)
+    const { data, count, error } = await query
+    if (error) throw new Error(`Failed to list leads for CRM: ${error.message}`)
+    return { data: (data ?? []) as Lead[], count: count ?? 0 }
+  }
+
+  async updateField(id: string, field: string, value: unknown): Promise<Lead> {
     const { data, error } = await supabaseAdmin
       .from('leads')
-      .update({
-        attio_sync_status: syncStatus,
-        attio_synced_at: new Date().toISOString(),
-      })
+      .update({ [field]: value })
       .eq('id', id)
       .select()
       .single()
-    if (error) throw new Error(`Failed to update sync status: ${error.message}`)
+    if (error) throw new Error(`Failed to update lead.${field}: ${error.message}`)
     return data as Lead
+  }
+
+  async bulkUpdateStatus(ids: string[], status: LeadStatus): Promise<void> {
+    if (ids.length === 0) return
+    const { error } = await supabaseAdmin
+      .from('leads')
+      .update({ status })
+      .in('id', ids)
+    if (error) throw new Error(`Failed to bulk-update status: ${error.message}`)
+  }
+
+  async getDistinctValues(field: 'status' | 'city' | 'niche'): Promise<string[]> {
+    const { data, error } = await supabaseAdmin
+      .from('leads')
+      .select(field)
+      .is('deleted_at', null)
+    if (error) throw new Error(`Failed to fetch distinct ${field}: ${error.message}`)
+    const set = new Set<string>()
+    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      const v = row[field]
+      if (typeof v === 'string' && v.length > 0) set.add(v)
+    }
+    return Array.from(set).sort()
   }
 
   async upsert(lead: Omit<Lead, 'id' | 'created_at'> & { id?: string }): Promise<Lead> {

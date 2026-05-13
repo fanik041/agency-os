@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './client'
-import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, AttioSyncStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
+import type { Lead, Client, ScrapeJob, CallLog, RevenueEvent, CallStatus, Contact, ResearchJob, LeadSourceType, LeadSource } from './types'
 import { LeadStatus } from './enums'
 
 // LEADS
@@ -107,26 +107,6 @@ export async function updateLeadStatus(id: string, status: LeadStatus, notes?: s
   return supabaseAdmin
     .from('leads')
     .update({ status, notes })
-    .eq('id', id)
-    .select()
-    .single()
-}
-
-export async function getUnsyncedLeads() {
-  return supabaseAdmin
-    .from('leads')
-    .select('*')
-    .eq('attio_sync_status', 'not_synced')
-    .order('created_at', { ascending: false })
-}
-
-export async function updateLeadAttioSync(id: string, syncStatus: AttioSyncStatus) {
-  return supabaseAdmin
-    .from('leads')
-    .update({
-      attio_sync_status: syncStatus,
-      attio_synced_at: new Date().toISOString(),
-    })
     .eq('id', id)
     .select()
     .single()

@@ -58,11 +58,9 @@ export async function checkLimit(userId: string, action: UsageAction): Promise<L
     max_scrapes_per_month: number | null
     max_scrapes_lifetime: number | null
     max_scrape_leads_lifetime: number | null
-    attio_sync_enabled: boolean
     cost_per_score_cents: number
     cost_per_scrape_cents: number
     cost_per_scrape_large_cents: number
-    cost_per_attio_sync_cents: number
   } | null
 
   // No subscription = free tier
@@ -121,16 +119,6 @@ export async function checkLimit(userId: string, action: UsageAction): Promise<L
         return { allowed: true, cost_cents: plan?.cost_per_scrape_large_cents ?? 100 }
       }
       return checkLimit(userId, UsageAction.Scrape)
-    }
-
-    case UsageAction.AttioSync: {
-      if (planId === PlanId.Free) {
-        return { allowed: false, reason: 'Attio sync is not available on the Free plan. Upgrade to Per Use or higher.' }
-      }
-      if (planId === PlanId.PerUse) {
-        return { allowed: true, cost_cents: plan?.cost_per_attio_sync_cents ?? 100 }
-      }
-      return { allowed: true, cost_cents: 0 }
     }
 
     default:

@@ -2,6 +2,17 @@
 
 Project state lives in `status.md` (current branch state, recent progress, open plans, next steps). Read it at session start.
 
+Known bugs: `bugs.md`. Resolved bugs: `fixes.md`. Always log new bugs/fixes there as they happen.
+
+## Session summary (most recent — 2026-05-13)
+
+- Shipped the `/crm` tab: native spreadsheet of leads (inline edit, sort/filter/columns/bulk, soft-delete + undo, CSV in/out of ALL rows, per-row AI scoring button)
+- Fully removed Attio CRM: deleted `packages/attio/`, all source refs, `AttioSyncStatus` enum, `attio_*` DB columns (via migration `20260513000001_drop_attio_columns.sql`)
+- New cell types in CRM: `text` (auto-resize textarea), `longtext` (popover), `collapsible` (preview + expand), `json` (collapsed pretty-print), `status` (dropdown), `boolean` (checkbox), `readonly` (formatted)
+- Per-row AI button calls `/api/score/stream` → scraper-service runs OpenAI scorer + pitch generator, writes `pain_score`/`pain_points`/`suggested_angle`/`message_draft`/`analyze` back to DB, table re-fetches
+- Attio portal spec (`docs/superpowers/specs/2026-03-31-attio-portal-design.md`) is now obsolete — do not implement
+- Migration workflow note: no `DATABASE_URL` in env; apply migrations via Supabase Studio SQL Editor (paste-and-run)
+
 ## Project shape
 
 Turborepo (pnpm workspaces).

@@ -5,7 +5,6 @@ import type { LeadStatus } from '@agency-os/db'
 import { LeadsClient } from '@/components/leads/leads-client'
 import { ImportLeadsDialog } from '@/components/leads/import-leads-dialog'
 import { AdvancedSearchDialog } from '@/components/leads/advanced-search-dialog'
-import { AttioViewerButton } from '@/components/leads/attio-viewer-button'
 
 import { DeduplicateLeadsButton } from '@/components/leads/deduplicate-leads-button'
 
@@ -44,7 +43,6 @@ export default async function LeadsPage({
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{totalCount} leads</span>
           <AdvancedSearchDialog sources={filterOptions.sources} scrapeJobs={scrapeJobs} />
-          <AttioViewerButton />
           <DeduplicateLeadsButton />
           <ImportLeadsDialog />
         </div>

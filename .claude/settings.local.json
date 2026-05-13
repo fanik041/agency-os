@@ -77,7 +77,17 @@
       "Bash(lsof -ti:3000)",
       "Bash(npx playwright:*)",
       "Read(//Users/fahimanik/Library/Caches/ms-playwright/**)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(pnpm --filter @agency-os/db add -D vitest)",
+      "Bash(pnpm --filter @agency-os/db test)",
+      "Bash(pnpm --filter @agency-os/dashboard typecheck)",
+      "Bash(pnpm --filter @agency-os/scraper-service typecheck)",
+      "Bash(echo \"EXITCODE=$?\")",
+      "Bash(awk *)",
+      "Bash(pnpm --filter @agency-os/dashboard dev)",
+      "Bash(tee /tmp/agency-os-dev.log)",
+      "Read(//private/tmp/**)",
+      "Bash(curl *)"
     ]
   },
   "enableAllProjectMcpServers": true,

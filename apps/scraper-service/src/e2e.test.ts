@@ -1,8 +1,8 @@
 /**
- * End-to-end test: fetch leads → pick 3 with websites → analyze → push to Attio + Supabase.
+ * End-to-end test: fetch leads → pick 3 with websites → analyze → push to Supabase.
  * Skips the OpenAI scoring phase.
  *
- * Requires env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ATTIO_API_KEY, ATTIO_LIST_ID
+ * Requires env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 import { config } from 'dotenv'
 import { resolve } from 'path'
@@ -13,8 +13,6 @@ import { analyzeWebsite } from './analyzer'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const ATTIO_API_KEY = process.env.ATTIO_API_KEY
-const ATTIO_LIST_ID = process.env.ATTIO_LIST_ID
 
 interface LeadRow {
   id: string
@@ -91,7 +89,7 @@ describe('Phase 3: Analyze websites', () => {
   })
 })
 
-describe('Phase 4: Push to Supabase and Attio', () => {
+describe('Phase 4: Push to Supabase', () => {
   it('should PATCH analyze results to Supabase', async () => {
     for (const lead of testLeads) {
       const result = analyzeResults[lead.id]
@@ -126,62 +124,6 @@ describe('Phase 4: Push to Supabase and Attio', () => {
       expect(updated.length).toBe(1)
       expect(updated[0].analyze).toBeTruthy()
       console.log(`  Supabase updated: ${lead.name}`)
-    }
-  })
-
-  it('should push to Attio (if configured)', async () => {
-    if (!ATTIO_API_KEY || !ATTIO_LIST_ID) {
-      console.log('  Skipping Attio push — ATTIO_API_KEY or ATTIO_LIST_ID not set')
-      return
-    }
-
-    for (const lead of testLeads) {
-      const domain = lead.website?.replace(/https?:\/\//, '').replace(/\/.*$/, '')
-      if (!domain) continue
-
-      // Upsert company
-      const compResp = await fetch('https://api.attio.com/v2/objects/companies/records?matching_attribute=domains', {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${ATTIO_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            values: {
-              name: [{ value: lead.name }],
-              domains: [{ domain }],
-            },
-          },
-        }),
-      })
-      expect(compResp.ok).toBe(true)
-      const compData = await compResp.json()
-      const recordId = compData?.data?.id?.record_id
-      expect(recordId).toBeTruthy()
-
-      // Add to list
-      const result = analyzeResults[lead.id]
-      const entryResp = await fetch(`https://api.attio.com/v2/lists/${ATTIO_LIST_ID}/entries`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${ATTIO_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            parent_record_id: recordId,
-            parent_object: 'companies',
-            entry_values: {
-              company_name: lead.name,
-              website: lead.website,
-              analyze: result ? JSON.stringify(result) : null,
-            },
-          },
-        }),
-      })
-      expect(entryResp.ok).toBe(true)
-      console.log(`  Attio updated: ${lead.name}`)
     }
   })
 })
